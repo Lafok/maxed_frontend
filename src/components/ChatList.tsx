@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-
-interface Participant {
-  id: string;
-  username: string;
-}
-
-interface Chat {
-  id: string;
-  participants: Participant[];
-}
+import { Chat, UserSummary } from '../types';
 
 interface ChatListProps {
   activeChatId: string | null;
@@ -34,7 +25,7 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
     fetchChats();
   }, []);
 
-  const getPartner = (participants: Participant[]) => {
+  const getPartner = (participants: UserSummary[]) => {
     return participants.find(p => p.username !== user?.sub);
   };
 
@@ -54,8 +45,10 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
             >
               <div className="w-10 h-10 bg-indigo-500 rounded-full mr-3"></div>
               <div>
-                <p className="font-semibold">{partner?.username || 'Unknown'}</p>
-                <p className="text-sm text-gray-400 truncate">Latest message preview...</p>
+                <p className="font-semibold">{partner?.username || 'Group Chat'}</p>
+                <p className="text-sm text-gray-400 truncate">
+                  {chat.latestMessage?.content || 'No messages yet'}
+                </p>
               </div>
             </div>
           );
