@@ -1,7 +1,21 @@
-const ChatPage = () => (
-  <div className="min-h-screen bg-gray-100 flex flex-col justify-center items-center">
-    <h1 className="text-3xl font-bold">Chat Page</h1>
-  </div>
-);
+import { useState } from 'react';
+import ChatList from '../components/ChatList';
+import MessageArea from '../components/MessageArea';
+
+const ChatPage = () => {
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  return (
+    <div className="h-screen flex">
+      <ChatList
+        activeChatId={activeChatId}
+        setActiveChatId={setActiveChatId}
+      />
+      <MessageArea
+        activeChatId={activeChatId}
+      />
+    </div>
+  );
+};
 
 export default ChatPage;

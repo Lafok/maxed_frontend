@@ -1,13 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './hooks/useAuth';
+import { AuthProvider } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
-
-const PrivateRoute = ({ children }: { children: JSX.Element }) => {
-  const { token } = useAuth();
-  return token ? children : <Navigate to="/login" />;
-};
+import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => (
   <Router>
@@ -18,9 +14,9 @@ const App = () => (
         <Route
           path="/chat"
           element={
-            <PrivateRoute>
+            <ProtectedRoute>
               <ChatPage />
-            </PrivateRoute>
+            </ProtectedRoute>
           }
         />
         <Route path="*" element={<Navigate to="/login" />} />
