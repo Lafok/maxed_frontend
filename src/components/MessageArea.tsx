@@ -136,10 +136,10 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
   };
 
   return (
-      <div className="flex-grow flex flex-col bg-white">
+      <div className="flex-grow flex flex-col bg-gray-100 dark:bg-gray-900">
         {/* Header */}
-        <div className="flex items-center p-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800">{chatPartner}</h2>
+        <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">{chatPartner}</h2>
         </div>
 
         {/* Message List */}
