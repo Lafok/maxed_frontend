@@ -1,18 +1,19 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { StompSubscription } from '@stomp/stompjs';
 
 // Local Imports
 import api from '../services/api';
 import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
-import { Message as MessageType } from '../types'; // Centralized types
+import { Message as MessageType } from '../types';
 
 // Child Components
 import Message from './Message';
 import MessageInput from './MessageInput';
-import Spinner from './Spinner'; // A simple loading spinner component
+import Spinner from './Spinner';
 
-// Prop definition for the component
+const MESSAGES_PER_PAGE = 50; // Определяем количество сообщений на странице
+
 interface MessageAreaProps {
   activeChatId: string | null;
 }
@@ -24,41 +25,87 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Состояния для пагинации и бесконечного скролла
+  const [page, setPage] = useState(0);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [isFetchingOlderMessages, setIsFetchingOlderMessages] = useState(false);
+
   const { user } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null); // Для скролла к последнему сообщению
+  const messagesContainerRef = useRef<HTMLDivElement>(null); // Для отслеживания скролла
+  const prevScrollHeightRef = useRef(0); // Для корректировки скролла при подгрузке старых сообщений
 
   // --- HOOKS ---
 
-  /**
-   * Effect for fetching data and managing WebSocket subscriptions.
-   * This is the core logic of the component.
-   */
+  // Функция для загрузки сообщений
+  const fetchMessages = useCallback(async (chatId: string, pageNumber: number, isInitialLoad: boolean) => {
+    if (!chatId) return;
+
+    if (isInitialLoad) {
+      setLoading(true);
+      setError(null);
+      setMessages([]); // Очищаем сообщения при загрузке нового чата
+      setPage(0); // Сбрасываем страницу
+      setHasMoreMessages(true); // Сбрасываем флаг
+    } else {
+      setIsFetchingOlderMessages(true);
+    }
+
+    try {
+      const response = await api.get(`/chats/${chatId}/messages`, {
+        params: { page: pageNumber, size: MESSAGES_PER_PAGE }
+      });
+
+      const newMessages = response.data.content.reverse(); // Сообщения приходят от старых к новым, поэтому реверсируем
+
+      if (isInitialLoad) {
+        setMessages(newMessages);
+      } else {
+        // Сохраняем текущую высоту скролла перед добавлением новых сообщений
+        if (messagesContainerRef.current) {
+          prevScrollHeightRef.current = messagesContainerRef.current.scrollHeight;
+        }
+        setMessages(prevMessages => [...newMessages, ...prevMessages]);
+      }
+
+      setHasMoreMessages(newMessages.length === MESSAGES_PER_PAGE);
+      setPage(pageNumber);
+
+    } catch (err) {
+      console.error('Failed to fetch messages', err);
+      setError('Failed to load messages. Please try again.');
+    } finally {
+      if (isInitialLoad) {
+        setLoading(false);
+      } else {
+        setIsFetchingOlderMessages(false);
+      }
+    }
+  }, []);
+
+  // Основной эффект для инициализации чата и подписки на WebSocket
   useEffect(() => {
-    // If no chat is selected, clear the state and do nothing.
     if (!activeChatId) {
       setMessages([]);
       setChatPartner('Select a chat');
+      setLoading(false);
+      setError(null);
+      setPage(0);
+      setHasMoreMessages(true);
       return;
     }
 
-    // This flag prevents state updates on an unmounted component, avoiding race conditions.
     let isMounted = true;
     let subscription: StompSubscription | null = null;
 
     const setupChat = async () => {
-      setLoading(true);
-      setError(null);
+      // Загружаем первую страницу сообщений
+      await fetchMessages(activeChatId, 0, true);
 
+      // Получаем информацию о партнере чата
       try {
-        // Fetch message history and chat details concurrently for better performance.
-        const [messagesResponse, chatDetailsResponse] = await Promise.all([
-          api.get(`/chats/${activeChatId}/messages?page=0&size=50`),
-          api.get(`/chats/${activeChatId}`)
-        ]);
-
-        // Only update state if the component is still mounted.
+        const chatDetailsResponse = await api.get(`/chats/${activeChatId}`);
         if (isMounted) {
-          setMessages(messagesResponse.data.content.reverse());
           const partner = chatDetailsResponse.data.participants.find(
               (p: any) => p.username !== user?.sub
           );
@@ -66,20 +113,14 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         }
       } catch (err) {
         if (isMounted) {
-          setError('Failed to load chat data. Please try again.');
+          setError('Failed to load chat details.');
         }
-        console.error('Failed to fetch initial chat data', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        console.error('Failed to fetch chat details', err);
       }
 
-      // Subscribe to the WebSocket topic for real-time messages.
+      // Подписываемся на WebSocket
       const topic = `/topic/chats/${activeChatId}`;
       subscription = await websocketService.subscribe(topic, (newMessage: MessageType) => {
-        // We check isMounted again, as the component could have unmounted
-        // while waiting for the subscription to activate.
         if (isMounted) {
           setMessages((prevMessages) => [...prevMessages, newMessage]);
         }
@@ -88,23 +129,42 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
 
     setupChat();
 
-    // Cleanup function: This is CRITICAL for preventing memory leaks.
-    // It runs when the component unmounts or when `activeChatId` changes.
     return () => {
       isMounted = false;
       if (subscription) {
         subscription.unsubscribe();
       }
     };
-  }, [activeChatId, user?.sub]); // Re-run this effect when the chat or user changes.
+  }, [activeChatId, user?.sub, fetchMessages]); // Добавил fetchMessages в зависимости
 
-  /**
-   * Effect for automatically scrolling to the bottom when new messages are added.
-   */
+  // Эффект для автоматического скролла к последнему сообщению при добавлении нового
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
+  // Эффект для корректировки скролла после загрузки старых сообщений
+  useEffect(() => {
+    if (!isFetchingOlderMessages && messagesContainerRef.current && prevScrollHeightRef.current > 0) {
+      const newScrollHeight = messagesContainerRef.current.scrollHeight;
+      messagesContainerRef.current.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+      prevScrollHeightRef.current = 0; // Сбрасываем
+    }
+  }, [messages, isFetchingOlderMessages]);
+
+
+  // Обработчик скролла для подгрузки старых сообщений
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop } = messagesContainerRef.current;
+
+      // Если прокрутили до самого верха
+      if (scrollTop === 0 && hasMoreMessages && !isFetchingOlderMessages && activeChatId) {
+        fetchMessages(activeChatId, page + 1, false);
+      }
+    }
+  };
 
   // --- RENDER LOGIC ---
 
@@ -123,15 +183,22 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
       );
     }
     return (
-        messages.map((msg) => (
-            <Message
-                key={msg.id}
-                content={msg.content}
-                senderUsername={msg.author.username}
-                timestamp={msg.timestamp}
-                isOwnMessage={msg.author.username === user?.sub}
-            />
-        ))
+        <>
+          {isFetchingOlderMessages && (
+              <div className="flex justify-center py-2">
+                <Spinner />
+              </div>
+          )}
+          {messages.map((msg) => (
+              <Message
+                  key={msg.id}
+                  content={msg.content}
+                  senderUsername={msg.author.username}
+                  timestamp={msg.timestamp}
+                  isOwnMessage={msg.author.username === user?.sub}
+              />
+          ))}
+        </>
     );
   };
 
@@ -143,7 +210,11 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         </div>
 
         {/* Message List */}
-        <div className="flex-grow p-4 overflow-y-auto">
+        <div
+            ref={messagesContainerRef}
+            className="flex-grow p-4 overflow-y-auto"
+            onScroll={handleScroll} // Добавляем обработчик скролла
+        >
           {renderContent()}
           <div ref={messagesEndRef} />
         </div>
