@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import GenericInput from './GenericInput';
-import Button from './Button';
+import GenericInput from './GenericInput'; // Предполагается, что GenericInput хорошо стилизован
+import Button from './Button'; // Предполагается, что Button хорошо стилизован
 import api from '../services/api';
 import clsx from 'clsx';
 import Spinner from './Spinner';
@@ -15,23 +15,23 @@ const getInitials = (name: string) => {
 };
 
 const Avatar = ({ name }: { name: string }) => (
-    <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold flex-shrink-0">
+    <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm">
         {getInitials(name)}
     </div>
 );
 
 // --- Основной компонент ---
 interface User {
-    id: number; // Изменено на number
+    id: number;
     username: string;
-    email: string; // Добавлено, так как есть в ответе
-    role: string; // Добавлено, так как есть в ответе
+    email: string;
+    role: string;
 }
 
 interface CreateChatModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onCreateChat: (userId: number) => void; // Изменено на number
+    onCreateChat: (userId: number) => void;
 }
 
 const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCreateChat }) => {
@@ -44,8 +44,12 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCr
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        if (isOpen) setIsMounted(true);
-        else {
+        if (isOpen) {
+            setIsMounted(true);
+            setSearchQuery(''); // Сбрасываем поиск при открытии
+            setSearchResults([]);
+            setError(null);
+        } else {
             const timer = setTimeout(() => setIsMounted(false), 300);
             return () => clearTimeout(timer);
         }
@@ -53,26 +57,33 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCr
 
     useEffect(() => {
         if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
         if (searchQuery.trim() === '') {
             setSearchResults([]);
             setError(null);
             setIsLoading(false);
             return;
         }
+
         setIsLoading(true);
         setError(null);
+
         debounceTimeout.current = setTimeout(async () => {
             try {
                 const response = await api.get('/users/search', { params: { name: searchQuery } });
                 setSearchResults(response.data);
-                if (response.data.length === 0) setError('No users found.');
+                // Если нет результатов, но запрос был, устанавливаем ошибку
+                if (response.data.length === 0) {
+                    setError('No users found matching your search.');
+                }
             } catch (err) {
                 console.error('Error searching users:', err);
-                setError('An error occurred. Please try again.');
+                setError('An error occurred while searching. Please try again.');
             } finally {
                 setIsLoading(false);
             }
-        }, 300);
+        }, 300); // Дебаунс 300ms
+        
         return () => {
             if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
         };
@@ -80,6 +91,8 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCr
 
     const handleClose = () => {
         setSearchQuery('');
+        setSearchResults([]);
+        setError(null);
         onClose();
     };
 
@@ -88,13 +101,13 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCr
     return (
         <div
             className={clsx(
-                "fixed inset-0 z-50 flex justify-center items-start pt-20 sm:pt-0 sm:items-center",
+                "fixed inset-0 z-50 flex justify-center items-start pt-10 sm:pt-0 sm:items-center", // Немного опустил на мобильных
                 !isOpen && "pointer-events-none"
             )}
         >
             <div
                 className={clsx(
-                    "absolute inset-0 bg-black/40 transition-opacity duration-300",
+                    "absolute inset-0 bg-black/50 transition-opacity duration-300", // Затемнение фона
                     isOpen ? "opacity-100" : "opacity-0"
                 )}
                 onClick={handleClose}
@@ -102,13 +115,13 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCr
             
             <div
                 className={clsx(
-                    "relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 ease-out",
+                    "relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg transform transition-all duration-300 ease-out", // max-w-lg для большей ширины
                     isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
                 )}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="p-6">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">New Conversation</h2>
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700"> {/* Добавил границу снизу */}
+                    <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">New Conversation</h2> {/* Увеличил размер заголовка */}
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Find someone to start a chat with.</p>
                     
                     <div className="relative">
@@ -118,23 +131,35 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({ isOpen, onClose, onCr
                             placeholder="Search by username"
                             value={searchQuery}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-                            className="pl-10 w-full bg-gray-50 dark:bg-gray-700 dark:text-white border-gray-200 dark:border-gray-600 focus:ring-indigo-500"
+                            className="pl-10 w-full bg-gray-100 dark:bg-gray-700 dark:text-white border-transparent focus:border-indigo-500 focus:ring-indigo-500 rounded-lg py-2" // Улучшил стили инпута
                             autoFocus
                         />
                     </div>
                 </div>
 
-                <div className="max-h-72 min-h-[10rem] overflow-y-auto border-t border-gray-200 dark:border-gray-700">
-                    {isLoading && <div className="flex justify-center items-center h-full pt-10"><Spinner /></div>}
-                    {error && !isLoading && <p className="text-center text-gray-500 pt-10">{error}</p>}
-                    {!isLoading && searchResults.map((user) => (
+                <div className="max-h-80 min-h-[10rem] overflow-y-auto"> {/* Увеличил max-h */}
+                    {isLoading && (
+                        <div className="flex justify-center items-center h-full py-8">
+                            <Spinner />
+                        </div>
+                    )}
+                    {!isLoading && error && (
+                        <p className="text-center text-gray-500 dark:text-gray-400 py-8 px-4">{error}</p>
+                    )}
+                    {!isLoading && !error && searchResults.length === 0 && searchQuery.trim() !== '' && (
+                        <p className="text-center text-gray-500 dark:text-gray-400 py-8 px-4">No users found matching "{searchQuery}".</p>
+                    )}
+                    {!isLoading && !error && searchResults.length === 0 && searchQuery.trim() === '' && (
+                        <p className="text-center text-gray-500 dark:text-gray-400 py-8 px-4">Start typing to find users.</p>
+                    )}
+                    {!isLoading && !error && searchResults.length > 0 && searchResults.slice(0, 5).map((user) => ( // Ограничение до 5 результатов
                         <div
                             key={user.id}
-                            className="flex items-center gap-4 p-3 mx-2 my-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                            className="flex items-center gap-4 p-3 mx-4 my-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                             onClick={() => { onCreateChat(user.id); handleClose(); }}
                         >
                             <Avatar name={user.username} />
-                            <span className="font-semibold text-gray-800 dark:text-gray-200">{user.username}</span>
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{user.username}</span>
                         </div>
                     ))}
                 </div>
