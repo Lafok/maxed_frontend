@@ -32,17 +32,29 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
     return participants.find(p => p.username !== user?.sub);
   };
 
-  const handleCreateChat = async (userId: string) => {
+  const handleCreateChat = async (userId: number) => {
     try {
-      const response = await api.post('/chats/direct', { participantId: userId });
-      const newChat = response.data;
+      const response = await api.post('/chats/direct', { partnerId: userId });
+      const newChat = response.data; // Бэкенд возвращает либо новый, либо существующий чат
       
-      setChats(prevChats => [newChat, ...prevChats]);
+      setChats(prevChats => {
+        // Проверяем, существует ли уже этот чат в нашем списке
+        const chatExists = prevChats.some(chat => chat.id === newChat.id);
+        if (!chatExists) {
+          // Если чата нет, добавляем его в начало списка
+          return [newChat, ...prevChats];
+        }
+        // Если чат уже есть, возвращаем текущий список без изменений
+        return prevChats;
+      });
+
+      // Устанавливаем активный чат на ID полученного чата (будь то новый или существующий)
       setActiveChatId(newChat.id);
-      setIsModalOpen(false);
+      setIsModalOpen(false); // Закрываем модальное окно
       
     } catch (error) {
       console.error('Failed to create direct chat', error);
+      // Здесь можно показать пользователю ошибку
     }
   };
 
