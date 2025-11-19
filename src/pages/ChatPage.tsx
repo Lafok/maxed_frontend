@@ -1,27 +1,25 @@
 import { useState, useEffect } from 'react';
 import ChatList from '../components/ChatList';
 import MessageArea from '../components/MessageArea';
-import websocketService from '../services/websocketService'; // ПРАВКА: Импортируем сервис
-import { useAuth } from '../hooks/useAuth'; // ПРАВКА: Импортируем useAuth
+import websocketService from '../services/websocketService';
+import { useAuth } from '../hooks/useAuth';
 
 const ChatPage = () => {
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
-    const { token } = useAuth(); // ПРАВКА: Получаем токен
+    const { token } = useAuth();
 
-    // ПРАВКА: Этот useEffect отвечает за установку и разрыв соединения
     useEffect(() => {
         if (token) {
             websocketService.connect(token);
         }
-
-        // Эта функция очистки выполнится, когда пользователь выйдет из системы (компонент размонтируется)
         return () => {
             websocketService.disconnect();
         };
-    }, [token]); // Зависимость от токена
+    }, [token]);
 
     return (
-        <div className="h-screen flex">
+        // Основной контейнер, занимающий весь экран
+        <div className="flex h-screen w-screen bg-gray-100 dark:bg-gray-900">
             <ChatList
                 activeChatId={activeChatId}
                 setActiveChatId={setActiveChatId}
