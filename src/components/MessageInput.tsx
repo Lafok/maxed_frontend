@@ -7,7 +7,7 @@ interface MessageInputProps {
 
 const MessageInput = ({ activeChatId }: MessageInputProps) => {
   const [message, setMessage] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null); // Добавляем ref для textarea
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const sendMessage = () => {
     if (message.trim() && activeChatId) {
@@ -15,6 +15,8 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
       const body = { content: message };
       websocketService.sendMessage(destination, body);
       setMessage('');
+      // После отправки сообщения, снова фокусируем textarea
+      textareaRef.current?.focus();
     }
   };
 
@@ -25,38 +27,56 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // Предотвращаем добавление новой строки при Enter
+      e.preventDefault();
       sendMessage();
     }
-    // Для Shift+Enter стандартное поведение textarea (добавление новой строки)
-    // не блокируется, так что ничего дополнительно делать не нужно.
   };
 
   // Эффект для автоматического изменения высоты textarea
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; // Сбрасываем высоту, чтобы получить scrollHeight
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 100)}px`; // Устанавливаем новую высоту, ограничивая 100px
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 100)}px`;
     }
-  }, [message]); // Запускаем эффект при изменении сообщения
+  }, [message]);
+
+  // Эффект для автоматической установки фокуса при смене активного чата
+  useEffect(() => {
+    if (activeChatId && textareaRef.current) {
+      // Используем setTimeout, чтобы убедиться, что элемент полностью включен и отрисован
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [activeChatId]);
+
+  // Обработчик потери фокуса для textarea
+  const handleBlur = () => {
+    if (activeChatId && textareaRef.current) {
+      // Немедленно возвращаем фокус, если чат активен
+      textareaRef.current.focus();
+    }
+  };
 
   return (
     <form onSubmit={handleFormSubmit} className="p-4 flex items-end">
       <textarea
-        ref={textareaRef} // Привязываем ref к textarea
+        ref={textareaRef}
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
+        onBlur={handleBlur} // Добавляем обработчик потери фокуса
         placeholder="Type a message..."
-        className="flex-grow p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white resize-none" // resize-none для отключения ручного изменения размера
+        className="flex-grow p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
         disabled={!activeChatId}
-        rows={1} // Начальная высота
-        style={{ maxHeight: '100px' }} // Ограничение максимальной высоты
+        rows={1}
+        style={{ maxHeight: '100px' }}
       />
       <button
         type="submit"
         className="ml-2 px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center justify-center hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={!activeChatId || !message.trim()} // Отключаем кнопку, если нет активного чата или сообщение пустое
+        disabled={!activeChatId || !message.trim()}
       >
         {/* Иконка самолетика (SVG) */}
         <svg
