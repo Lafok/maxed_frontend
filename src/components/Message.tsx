@@ -11,7 +11,7 @@ interface MessageProps {
 const Message = ({ content, senderUsername, timestamp, isOwnMessage }: MessageProps) => {
   const messageContainerClasses = clsx('flex mb-4', isOwnMessage ? 'justify-end' : 'justify-start');
   const messageBubbleClasses = clsx(
-    'py-2 px-4 rounded-2xl max-w-lg',
+    'py-2 px-4 rounded-2xl max-w-lg whitespace-pre-wrap break-words', // Добавлен break-words
     isOwnMessage ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-800'
   );
 
