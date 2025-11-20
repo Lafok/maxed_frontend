@@ -1,6 +1,6 @@
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom'; // Импортируем Link
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useAuth } from '../hooks/useAuth';
@@ -16,9 +16,11 @@ const LoginPage = () => {
   const { login } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col justify-center items-center">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">Welcome Back</h2>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col justify-center items-center p-4">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+        <h2 className="text-4xl font-extrabold mb-2 text-center text-gray-900 dark:text-white">Welcome Back</h2>
+        <p className="text-center text-gray-500 dark:text-gray-400 mb-8">Sign in to continue</p>
+        
         <Formik
           initialValues={{ username: '', password: '' }}
           validationSchema={LoginSchema}
@@ -35,16 +37,31 @@ const LoginPage = () => {
           }}
         >
           {({ isSubmitting, status, errors, touched }) => (
-            <Form>
+            <Form className="space-y-6">
               <Input name="username" type="text" placeholder="Username" hasError={!!(errors.username && touched.username)} />
               <Input name="password" type="password" placeholder="Password" hasError={!!(errors.password && touched.password)} />
+              
+              {status?.error && (
+                <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative text-center">
+                  {status.error}
+                </div>
+              )}
+
               <Button type="submit" disabled={isSubmitting} fullWidth>
-                Login
+                {isSubmitting ? 'Logging in...' : 'Login'}
               </Button>
-              {status?.error && <div className="text-red-500 text-center mt-4">{status.error}</div>}
             </Form>
           )}
         </Formik>
+
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Don't have an account?{' '}
+            <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+              Sign up
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
