@@ -1,13 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import websocketService from '../services/websocketService';
+
+// Экспортируем интерфейс для ref, чтобы родительский компонент знал о методе focus
+export interface MessageInputRef {
+  focus: () => void;
+}
 
 interface MessageInputProps {
   activeChatId: string | null;
 }
 
-const MessageInput = ({ activeChatId }: MessageInputProps) => {
+const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeChatId }, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // useImperativeHandle позволяет родительскому компоненту вызывать методы дочернего
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus();
+    }
+  }));
 
   const sendMessage = () => {
     if (message.trim() && activeChatId) {
@@ -15,7 +27,6 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
       const body = { content: message };
       websocketService.sendMessage(destination, body);
       setMessage('');
-      // После отправки сообщения, снова фокусируем textarea
       textareaRef.current?.focus();
     }
   };
@@ -32,7 +43,6 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
     }
   };
 
-  // Эффект для автоматического изменения высоты textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -40,24 +50,14 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
     }
   }, [message]);
 
-  // Эффект для автоматической установки фокуса при смене активного чата
   useEffect(() => {
     if (activeChatId && textareaRef.current) {
-      // Используем setTimeout, чтобы убедиться, что элемент полностью включен и отрисован
       const timer = setTimeout(() => {
         textareaRef.current?.focus();
       }, 0);
       return () => clearTimeout(timer);
     }
   }, [activeChatId]);
-
-  // Обработчик потери фокуса для textarea
-  const handleBlur = () => {
-    if (activeChatId && textareaRef.current) {
-      // Немедленно возвращаем фокус, если чат активен
-      textareaRef.current.focus();
-    }
-  };
 
   return (
     <form onSubmit={handleFormSubmit} className="p-4 flex items-end">
@@ -66,7 +66,7 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        onBlur={handleBlur} // Добавляем обработчик потери фокуса
+        // onBlur был удален, чтобы избежать агрессивного перехвата фокуса
         placeholder="Type a message..."
         className="flex-grow p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
         disabled={!activeChatId}
@@ -78,7 +78,6 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
         className="ml-2 px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center justify-center hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={!activeChatId || !message.trim()}
       >
-        {/* Иконка самолетика (SVG) */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
@@ -90,6 +89,6 @@ const MessageInput = ({ activeChatId }: MessageInputProps) => {
       </button>
     </form>
   );
-};
+});
 
 export default MessageInput;

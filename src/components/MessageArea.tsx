@@ -9,10 +9,10 @@ import { Message as MessageType } from '../types';
 
 // Child Components
 import Message from './Message';
-import MessageInput from './MessageInput';
+import MessageInput, { MessageInputRef } from './MessageInput'; // Импортируем MessageInputRef
 import Spinner from './Spinner';
 
-const MESSAGES_PER_PAGE = 50; // Определяем количество сообщений на странице
+const MESSAGES_PER_PAGE = 50;
 
 interface MessageAreaProps {
   activeChatId: string | null;
@@ -25,28 +25,27 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Состояния для пагинации и бесконечного скролла
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isFetchingOlderMessages, setIsFetchingOlderMessages] = useState(false);
 
   const { user } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null); // Для скролла к последнему сообщению
-  const messagesContainerRef = useRef<HTMLDivElement>(null); // Для отслеживания скролла
-  const prevScrollHeightRef = useRef(0); // Для корректировки скролла при подгрузке старых сообщений
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevScrollHeightRef = useRef(0);
+  const messageInputRef = useRef<MessageInputRef>(null); // Ref для MessageInput
 
   // --- HOOKS ---
 
-  // Функция для загрузки сообщений
   const fetchMessages = useCallback(async (chatId: string, pageNumber: number, isInitialLoad: boolean) => {
     if (!chatId) return;
 
     if (isInitialLoad) {
       setLoading(true);
       setError(null);
-      setMessages([]); // Очищаем сообщения при загрузке нового чата
-      setPage(0); // Сбрасываем страницу
-      setHasMoreMessages(true); // Сбрасываем флаг
+      setMessages([]);
+      setPage(0);
+      setHasMoreMessages(true);
     } else {
       setIsFetchingOlderMessages(true);
     }
@@ -56,12 +55,11 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         params: { page: pageNumber, size: MESSAGES_PER_PAGE }
       });
 
-      const newMessages = response.data.content.reverse(); // Сообщения приходят от старых к новым, поэтому реверсируем
+      const newMessages = response.data.content.reverse();
 
       if (isInitialLoad) {
         setMessages(newMessages);
       } else {
-        // Сохраняем текущую высоту скролла перед добавлением новых сообщений
         if (messagesContainerRef.current) {
           prevScrollHeightRef.current = messagesContainerRef.current.scrollHeight;
         }
@@ -83,7 +81,6 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
     }
   }, []);
 
-  // Основной эффект для инициализации чата и подписки на WebSocket
   useEffect(() => {
     if (!activeChatId) {
       setMessages([]);
@@ -99,10 +96,8 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
     let subscription: StompSubscription | null = null;
 
     const setupChat = async () => {
-      // Загружаем первую страницу сообщений
       await fetchMessages(activeChatId, 0, true);
 
-      // Получаем информацию о партнере чата
       try {
         const chatDetailsResponse = await api.get(`/chats/${activeChatId}`);
         if (isMounted) {
@@ -118,7 +113,6 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         console.error('Failed to fetch chat details', err);
       }
 
-      // Подписываемся на WebSocket
       const topic = `/topic/chats/${activeChatId}`;
       subscription = await websocketService.subscribe(topic, (newMessage: MessageType) => {
         if (isMounted) {
@@ -135,35 +129,34 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         subscription.unsubscribe();
       }
     };
-  }, [activeChatId, user?.sub, fetchMessages]); // Добавил fetchMessages в зависимости
+  }, [activeChatId, user?.sub, fetchMessages]);
 
-  // Эффект для автоматического скролла к последнему сообщению при добавлении нового
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  // Эффект для корректировки скролла после загрузки старых сообщений
   useEffect(() => {
     if (!isFetchingOlderMessages && messagesContainerRef.current && prevScrollHeightRef.current > 0) {
       const newScrollHeight = messagesContainerRef.current.scrollHeight;
       messagesContainerRef.current.scrollTop = newScrollHeight - prevScrollHeightRef.current;
-      prevScrollHeightRef.current = 0; // Сбрасываем
+      prevScrollHeightRef.current = 0;
     }
   }, [messages, isFetchingOlderMessages]);
 
-
-  // Обработчик скролла для подгрузки старых сообщений
   const handleScroll = () => {
     if (messagesContainerRef.current) {
       const { scrollTop } = messagesContainerRef.current;
-
-      // Если прокрутили до самого верха
       if (scrollTop === 0 && hasMoreMessages && !isFetchingOlderMessages && activeChatId) {
         fetchMessages(activeChatId, page + 1, false);
       }
     }
+  };
+
+  // Обработчик клика на область сообщений для фокусировки
+  const handleMessageAreaClick = () => {
+    messageInputRef.current?.focus();
   };
 
   // --- RENDER LOGIC ---
@@ -213,14 +206,15 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         <div
             ref={messagesContainerRef}
             className="flex-grow p-4 overflow-y-auto"
-            onScroll={handleScroll} // Добавляем обработчик скролла
+            onScroll={handleScroll}
+            onClick={handleMessageAreaClick} // Добавляем обработчик клика
         >
           {renderContent()}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Message Input */}
-        <MessageInput activeChatId={activeChatId} />
+        <MessageInput ref={messageInputRef} activeChatId={activeChatId} />
       </div>
   );
 };
