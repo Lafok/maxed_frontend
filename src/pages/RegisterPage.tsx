@@ -25,9 +25,9 @@ const RegisterPage = () => {
           validationSchema={RegisterSchema}
           onSubmit={async (values, { setSubmitting, setStatus }) => {
             try {
-              await api.post('/users/register', values);
+              await api.post('/auth/register', values); // Изменен эндпоинт
               setStatus({ success: 'Registration successful! Redirecting to login...' });
-              setTimeout(() => navigate('/login'), 2000);
+              setTimeout(() => navigate('/login'));
             } catch (error) {
               setStatus({ error: 'Registration failed. This username or email might already be taken.' });
             } finally {
