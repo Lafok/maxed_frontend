@@ -1,12 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { Chat, UserSummary } from '../types';
-import GenericInput from './GenericInput'; // Для поля поиска
-import Spinner from './Spinner'; // Для индикации загрузки
-import clsx from 'clsx'; // Для условных классов
+import GenericInput from './GenericInput';
+import Spinner from './Spinner';
+import clsx from 'clsx';
 
-// --- Вспомогательные компоненты и утилиты (перенесены из CreateChatModal) ---
+// --- Вспомогательные компоненты и утилиты ---
 const getInitials = (name: string) => {
     const names = name.split(' ');
     if (names.length > 1) {
@@ -15,50 +15,41 @@ const getInitials = (name: string) => {
     return name.substring(0, 2).toUpperCase();
 };
 
-const Avatar = ({ name }: { name: string }) => (
-    <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm">
-        {getInitials(name)}
+const Avatar = ({ name, isOnline }: { name: string; isOnline: boolean }) => (
+    <div className="relative w-10 h-10 flex-shrink-0">
+        <div className="w-full h-full rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm">
+            {getInitials(name)}
+        </div>
+        {isOnline && (
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+        )}
     </div>
 );
 
-interface User { // Интерфейс для результатов поиска пользователей
+interface User {
     id: number;
     username: string;
     email: string;
     role: string;
+    isOnline: boolean;
 }
 // --- Конец вспомогательных компонентов ---
 
 interface ChatListProps {
-  activeChatId: string | null;
-  setActiveChatId: (id: string) => void;
+  chats: Chat[];
+  setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
+  activeChatId: number | null;
+  setActiveChatId: (id: number) => void;
 }
 
-const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
-  const [chats, setChats] = useState<Chat[]>([]);
+const ChatList = ({ chats, setChats, activeChatId, setActiveChatId }: ChatListProps) => {
   const { user } = useAuth();
-
-  // Состояния для поиска пользователей
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeout = useRef<number | null>(null);
 
-  const fetchChats = async () => {
-    try {
-      const response = await api.get('/chats');
-      setChats(response.data);
-    } catch (error) {
-      console.error('Failed to fetch chats', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchChats();
-  }, []);
-
-  // Эффект для дебаунса поиска пользователей
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
@@ -72,7 +63,7 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
     setIsLoadingSearch(true);
     setSearchError(null);
 
-    debounceTimeout.current = setTimeout(async () => {
+    debounceTimeout.current = window.setTimeout(async () => {
         try {
             const response = await api.get('/users/search', { params: { name: searchQuery } });
             setSearchResults(response.data);
@@ -110,12 +101,11 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
       });
 
       setActiveChatId(newChat.id);
-      setSearchQuery(''); // Очищаем поисковый запрос после создания чата
-      setSearchResults([]); // Очищаем результаты поиска
+      setSearchQuery('');
+      setSearchResults([]);
       
     } catch (error) {
       console.error('Failed to create direct chat', error);
-      // Здесь можно показать пользователю ошибку
     }
   };
 
@@ -127,6 +117,8 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
     }
     return chats.map((chat) => {
       const partner = getPartner(chat.participants);
+      const isPartnerOnline = partner ? partner.isOnline : false;
+
       return (
         <div
           key={chat.id}
@@ -136,7 +128,7 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
           )}
           onClick={() => setActiveChatId(chat.id)}
         >
-          <Avatar name={partner?.username || 'Group Chat'} /> {/* Используем Avatar */}
+          <Avatar name={partner?.username || 'Group Chat'} isOnline={isPartnerOnline} />
           <div className="ml-3 truncate">
             <p className="font-semibold">{partner?.username || 'Group Chat'}</p>
             <p className="text-sm text-gray-400 truncate">
@@ -168,7 +160,7 @@ const ChatList = ({ activeChatId, setActiveChatId }: ChatListProps) => {
         className="flex items-center gap-4 p-3 mx-2 my-1 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors"
         onClick={() => handleCreateChat(user.id)}
       >
-        <Avatar name={user.username} />
+        <Avatar name={user.username} isOnline={user.isOnline} />
         <span className="font-medium text-gray-200">{user.username}</span>
       </div>
     ));

@@ -5,23 +5,22 @@ import { StompSubscription } from '@stomp/stompjs';
 import api from '../services/api';
 import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
-import { Message as MessageType } from '../types';
+import { Message as MessageType, Chat, UserSummary } from '../types';
 
 // Child Components
 import Message from './Message';
-import MessageInput, { MessageInputRef } from './MessageInput'; // Импортируем MessageInputRef
+import MessageInput, { MessageInputRef } from './MessageInput';
 import Spinner from './Spinner';
 
 const MESSAGES_PER_PAGE = 50;
 
 interface MessageAreaProps {
-  activeChatId: string | null;
+  activeChat: Chat | undefined; // ИЗМЕНЕНО: принимаем весь объект чата
 }
 
-const MessageArea = ({ activeChatId }: MessageAreaProps) => {
+const MessageArea = ({ activeChat }: MessageAreaProps) => {
   // --- STATE MANAGEMENT ---
   const [messages, setMessages] = useState<MessageType[]>([]);
-  const [chatPartner, setChatPartner] = useState<string>('Select a chat');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,13 +32,11 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);
-  const messageInputRef = useRef<MessageInputRef>(null); // Ref для MessageInput
+  const messageInputRef = useRef<MessageInputRef>(null);
 
   // --- HOOKS ---
 
-  const fetchMessages = useCallback(async (chatId: string, pageNumber: number, isInitialLoad: boolean) => {
-    if (!chatId) return;
-
+  const fetchMessages = useCallback(async (chatId: number, pageNumber: number, isInitialLoad: boolean) => {
     if (isInitialLoad) {
       setLoading(true);
       setError(null);
@@ -82,9 +79,8 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
   }, []);
 
   useEffect(() => {
-    if (!activeChatId) {
+    if (!activeChat) {
       setMessages([]);
-      setChatPartner('Select a chat');
       setLoading(false);
       setError(null);
       setPage(0);
@@ -96,24 +92,11 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
     let subscription: StompSubscription | null = null;
 
     const setupChat = async () => {
-      await fetchMessages(activeChatId, 0, true);
+      // Загружаем сообщения для нового активного чата
+      await fetchMessages(activeChat.id, 0, true);
 
-      try {
-        const chatDetailsResponse = await api.get(`/chats/${activeChatId}`);
-        if (isMounted) {
-          const partner = chatDetailsResponse.data.participants.find(
-              (p: any) => p.username !== user?.sub
-          );
-          setChatPartner(partner ? `Chat with ${partner.username}` : 'Group Chat');
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError('Failed to load chat details.');
-        }
-        console.error('Failed to fetch chat details', err);
-      }
-
-      const topic = `/topic/chats/${activeChatId}`;
+      // Подписываемся на новые сообщения в этом чате
+      const topic = `/topic/chats.${activeChat.id}`;
       subscription = await websocketService.subscribe(topic, (newMessage: MessageType) => {
         if (isMounted) {
           setMessages((prevMessages) => [...prevMessages, newMessage]);
@@ -129,7 +112,7 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
         subscription.unsubscribe();
       }
     };
-  }, [activeChatId, user?.sub, fetchMessages]);
+  }, [activeChat, fetchMessages]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -148,18 +131,22 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
   const handleScroll = () => {
     if (messagesContainerRef.current) {
       const { scrollTop } = messagesContainerRef.current;
-      if (scrollTop === 0 && hasMoreMessages && !isFetchingOlderMessages && activeChatId) {
-        fetchMessages(activeChatId, page + 1, false);
+      if (scrollTop === 0 && hasMoreMessages && !isFetchingOlderMessages && activeChat) {
+        fetchMessages(activeChat.id, page + 1, false);
       }
     }
   };
 
-  // Обработчик клика на область сообщений для фокусировки
   const handleMessageAreaClick = () => {
     messageInputRef.current?.focus();
   };
 
   // --- RENDER LOGIC ---
+
+  // Получаем партнера и его статус из activeChat
+  const partner = activeChat?.participants.find(p => p.username !== user?.sub);
+  const chatPartnerName = activeChat ? (partner?.username || 'Group Chat') : 'Select a chat';
+  const isPartnerOnline = partner?.isOnline ?? false;
 
   const renderContent = () => {
     if (loading) {
@@ -168,7 +155,7 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
     if (error) {
       return <div className="flex items-center justify-center h-full"><p className="text-red-500">{error}</p></div>;
     }
-    if (!activeChatId) {
+    if (!activeChat) {
       return (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-500">Select a chat from the sidebar to start messaging.</p>
@@ -186,7 +173,7 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
               <Message
                   key={msg.id}
                   content={msg.content}
-                  senderUsername={msg.author.username}
+                  author={msg.author}
                   timestamp={msg.timestamp}
                   isOwnMessage={msg.author.username === user?.sub}
               />
@@ -199,7 +186,12 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
       <div className="flex-grow flex flex-col bg-gray-100 dark:bg-gray-900">
         {/* Header */}
         <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">{chatPartner}</h2>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+            {chatPartnerName}
+            {isPartnerOnline && chatPartnerName !== 'Select a chat' && chatPartnerName !== 'Group Chat' && (
+                <span className="ml-2 w-3 h-3 bg-green-500 rounded-full"></span>
+            )}
+          </h2>
         </div>
 
         {/* Message List */}
@@ -207,14 +199,14 @@ const MessageArea = ({ activeChatId }: MessageAreaProps) => {
             ref={messagesContainerRef}
             className="flex-grow p-4 overflow-y-auto"
             onScroll={handleScroll}
-            onClick={handleMessageAreaClick} // Добавляем обработчик клика
+            onClick={handleMessageAreaClick}
         >
           {renderContent()}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Message Input */}
-        <MessageInput ref={messageInputRef} activeChatId={activeChatId} />
+        <MessageInput ref={messageInputRef} activeChatId={activeChat?.id ?? null} />
       </div>
   );
 };

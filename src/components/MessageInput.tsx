@@ -7,7 +7,7 @@ export interface MessageInputRef {
 }
 
 interface MessageInputProps {
-  activeChatId: string | null;
+  activeChatId: number | null; // ИЗМЕНЕНО
 }
 
 const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeChatId }, ref) => {

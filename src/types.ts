@@ -8,6 +8,7 @@
 export interface UserSummary {
   id: number;
   username: string;
+  isOnline: boolean; // Добавлено поле для статуса онлайн
 }
 
 // Represents a single chat message.
