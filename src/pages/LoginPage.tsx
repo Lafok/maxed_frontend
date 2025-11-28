@@ -1,6 +1,6 @@
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
-import { useNavigate, Link } from 'react-router-dom'; // Импортируем Link
+import { useNavigate, Link } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useAuth } from '../hooks/useAuth';

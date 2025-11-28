@@ -1,10 +1,10 @@
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { UserSummary } from '../types'; // Импортируем UserSummary
+import { UserSummary } from '../types';
 
 interface MessageProps {
   content: string;
-  author: UserSummary; // Заменяем senderUsername на полный объект author
+  author: UserSummary;
   timestamp: string;
   isOwnMessage: boolean;
 }
@@ -21,7 +21,6 @@ const Message = ({ content, author, timestamp, isOwnMessage }: MessageProps) => 
       <div>
         <div className="flex items-baseline mb-1">
           <span className="font-semibold text-sm text-gray-600 mr-2">{isOwnMessage ? 'You' : author.username}</span>
-          {/* Мы не будем показывать статус онлайн для каждого сообщения, чтобы не перегружать интерфейс */}
           <span className="text-xs text-gray-400">{format(new Date(timestamp), 'p')}</span>
         </div>
         <div className={messageBubbleClasses}>

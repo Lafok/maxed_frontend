@@ -2,7 +2,7 @@ import { createContext, useState, useEffect, ReactNode } from 'react';
 import { jwtDecode } from 'jwt-decode';
 
 interface User {
-  sub: string; // 'sub' (subject) in JWT is the username
+  sub: string;
 }
 
 interface AuthContextType {
@@ -27,7 +27,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(decodedUser);
       } catch (error) {
         console.error("Failed to decode token on initial load", error);
-        // Handle invalid token case, e.g., by logging out
         localStorage.removeItem('token');
       }
     }

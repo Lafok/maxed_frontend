@@ -1,6 +1,6 @@
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
-import { useNavigate, Link } from 'react-router-dom'; // Импортируем Link
+import { useNavigate, Link } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import api from '../services/api';
@@ -25,7 +25,7 @@ const RegisterPage = () => {
           validationSchema={RegisterSchema}
           onSubmit={async (values, { setSubmitting, setStatus }) => {
             try {
-              await api.post('/auth/register', values); // Изменен эндпоинт
+              await api.post('/auth/register', values);
               setStatus({ success: 'Registration successful! Redirecting to login...' });
               setTimeout(() => navigate('/login'));
             } catch (error) {

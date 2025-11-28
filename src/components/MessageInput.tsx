@@ -1,20 +1,18 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import websocketService from '../services/websocketService';
 
-// Экспортируем интерфейс для ref, чтобы родительский компонент знал о методе focus
 export interface MessageInputRef {
   focus: () => void;
 }
 
 interface MessageInputProps {
-  activeChatId: number | null; // ИЗМЕНЕНО
+  activeChatId: number | null;
 }
 
 const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeChatId }, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // useImperativeHandle позволяет родительскому компоненту вызывать методы дочернего
   useImperativeHandle(ref, () => ({
     focus: () => {
       textareaRef.current?.focus();
@@ -66,7 +64,6 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeCha
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        // onBlur был удален, чтобы избежать агрессивного перехвата фокуса
         placeholder="Type a message..."
         className="flex-grow p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
         disabled={!activeChatId}

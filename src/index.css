@@ -4,15 +4,11 @@ html, body, #root {
   height: 100%;
 }
 
-/* --- Переопределение стилей автозаполнения браузера для темной темы --- */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus, 
 input:-webkit-autofill:active {
-  /* Устанавливаем цвет фона поля ввода для темной темы */
   -webkit-box-shadow: 0 0 0 30px theme('colors.gray.700') inset !important;
-  /* Устанавливаем цвет текста для темной темы */
   -webkit-text-fill-color: theme('colors.white') !important;
-  /* Хак для задержки смены фона браузером */
   transition: background-color 5000s ease-in-out 0s;
 }

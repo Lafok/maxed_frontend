@@ -3,16 +3,15 @@ import ChatList from '../components/ChatList';
 import MessageArea from '../components/MessageArea';
 import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
-import { Chat, StatusUpdateMessage } from '../types'; // Импортируем типы
-import api from '../services/api'; // Импортируем api
+import { Chat, StatusUpdateMessage } from '../types';
+import api from '../services/api';
 import { StompSubscription } from '@stomp/stompjs';
 
 const ChatPage = () => {
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
-    const [chats, setChats] = useState<Chat[]>([]); // Состояние чатов теперь здесь
+    const [chats, setChats] = useState<Chat[]>([]);
     const { user, token } = useAuth();
 
-    // --- Логика WebSocket и загрузки данных теперь здесь ---
 
     const fetchChats = async () => {
         try {
@@ -27,14 +26,13 @@ const ChatPage = () => {
     useEffect(() => {
         if (token) {
             websocketService.connect(token);
-            fetchChats(); // Загружаем чаты после инициализации соединения
+            fetchChats();
         }
         return () => {
             websocketService.disconnect();
         };
     }, [token]);
 
-    // Подписка на обновления статуса
     useEffect(() => {
         if (!user?.sub) return;
 
@@ -74,19 +72,18 @@ const ChatPage = () => {
         };
     }, [user?.sub]);
 
-    // Находим активный чат
     const activeChat = chats.find(chat => chat.id === activeChatId);
 
     return (
         <div className="flex h-screen w-screen bg-gray-100 dark:bg-gray-900">
             <ChatList
-                chats={chats} // Передаем чаты как пропс
-                setChats={setChats} // Передаем функцию обновления
+                chats={chats}
+                setChats={setChats}
                 activeChatId={activeChatId}
                 setActiveChatId={setActiveChatId}
             />
             <MessageArea
-                activeChat={activeChat} // Передаем весь объект активного чата
+                activeChat={activeChat}
             />
         </div>
     );

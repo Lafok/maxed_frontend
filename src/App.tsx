@@ -5,7 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
-import './App.css'; // Возвращаем импорт App.css
+import './App.css';
 
 const App = () => (
   <Router>
