@@ -5,7 +5,7 @@ import { StompSubscription } from '@stomp/stompjs';
 import api from '../services/api';
 import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
-import { Message as MessageType, Chat, UserSummary } from '../types';
+import { Message as MessageType, Chat } from '../types';
 
 // Child Components
 import Message from './Message';
@@ -15,7 +15,7 @@ import Spinner from './Spinner';
 const MESSAGES_PER_PAGE = 50;
 
 interface MessageAreaProps {
-  activeChat: Chat | undefined; // ИЗМЕНЕНО: принимаем весь объект чата
+  activeChat: Chat | undefined;
 }
 
 const MessageArea = ({ activeChat }: MessageAreaProps) => {
@@ -78,8 +78,11 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
     }
   }, []);
 
+  // --- ИЗМЕНЕНО: Зависимость от activeChat.id ---
   useEffect(() => {
-    if (!activeChat) {
+    const chatId = activeChat?.id;
+
+    if (!chatId) {
       setMessages([]);
       setLoading(false);
       setError(null);
@@ -93,10 +96,10 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
 
     const setupChat = async () => {
       // Загружаем сообщения для нового активного чата
-      await fetchMessages(activeChat.id, 0, true);
+      await fetchMessages(chatId, 0, true);
 
       // Подписываемся на новые сообщения в этом чате
-      const topic = `/topic/chats.${activeChat.id}`;
+      const topic = `/topic/chats.${chatId}`;
       subscription = await websocketService.subscribe(topic, (newMessage: MessageType) => {
         if (isMounted) {
           setMessages((prevMessages) => [...prevMessages, newMessage]);
@@ -112,13 +115,15 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
         subscription.unsubscribe();
       }
     };
-  }, [activeChat, fetchMessages]);
+    // Зависимость теперь от ID, а не от всего объекта.
+    // Этот эффект не будет перезапускаться при смене статуса.
+  }, [activeChat?.id, fetchMessages]);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current && page === 0) { // Плавный скролл только при первой загрузке
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, page]);
 
   useEffect(() => {
     if (!isFetchingOlderMessages && messagesContainerRef.current && prevScrollHeightRef.current > 0) {
@@ -143,7 +148,6 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
 
   // --- RENDER LOGIC ---
 
-  // Получаем партнера и его статус из activeChat
   const partner = activeChat?.participants.find(p => p.username !== user?.sub);
   const chatPartnerName = activeChat ? (partner?.username || 'Group Chat') : 'Select a chat';
   const isPartnerOnline = partner?.isOnline ?? false;
