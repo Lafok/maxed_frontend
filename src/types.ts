@@ -24,3 +24,8 @@ export interface Chat {
   participants: UserSummary[];
   latestMessage?: Message;
 }
+
+export interface StatusUpdateMessage {
+    userId: number;
+    isOnline: boolean;
+}
