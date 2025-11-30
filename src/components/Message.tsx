@@ -1,13 +1,13 @@
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { UserSummary, MessageType, Message as MessagePropsType } from '../types';
+import { MessageType, Message as MessagePropsType } from '../types';
 
 interface MessageProps extends MessagePropsType {
   isOwnMessage: boolean;
   onMediaClick: (message: MessagePropsType) => void;
 }
 
-const MessageContent = ({ type, content, onMediaClick, message }: { type: MessageType; content: string; onMediaClick: () => void; message: MessagePropsType }) => {
+const MessageContent = ({ type, content, onMediaClick }: { type: MessageType; content: string; onMediaClick: () => void }) => {
   const isMedia = type === 'IMAGE' || type === 'VIDEO';
 
   const handleMediaClick = () => {
@@ -70,7 +70,7 @@ const Message = (props: MessageProps) => {
           <span className="text-xs text-gray-500 dark:text-gray-500">{format(new Date(timestamp), 'p')}</span>
         </div>
         <div className={messageBubbleClasses}>
-          <MessageContent type={type} content={content} onMediaClick={() => onMediaClick(props)} message={props} />
+          <MessageContent type={type} content={content} onMediaClick={() => onMediaClick(props)} />
         </div>
       </div>
     </div>

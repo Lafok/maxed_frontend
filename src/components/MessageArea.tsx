@@ -22,7 +22,6 @@ interface MessageAreaProps {
 const MessageArea = ({ activeChat, isDragging, openMediaModal, onMediaClick }: MessageAreaProps) => {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isFetchingOlderMessages, setIsFetchingOlderMessages] = useState(false);
@@ -36,7 +35,6 @@ const MessageArea = ({ activeChat, isDragging, openMediaModal, onMediaClick }: M
   const fetchMessages = useCallback(async (chatId: number, pageNumber: number, isInitialLoad: boolean) => {
     if (isInitialLoad) {
       setLoading(true);
-      setError(null);
       setMessages([]);
       setPage(0);
       setHasMoreMessages(true);
@@ -52,7 +50,6 @@ const MessageArea = ({ activeChat, isDragging, openMediaModal, onMediaClick }: M
       setPage(pageNumber);
     } catch (err) {
       console.error('Failed to fetch messages', err);
-      setError('Failed to load messages. Please try again.');
     } finally {
       setLoading(false);
       setIsFetchingOlderMessages(false);
