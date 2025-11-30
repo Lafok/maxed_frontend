@@ -65,7 +65,6 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeCha
   return (
     <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
       <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
-        {/* --- ДОБАВЛЕНО: Кнопка загрузки медиа --- */}
         <MediaUploader onMediaUploaded={handleSendMessage} />
 
         <textarea
