@@ -9,11 +9,14 @@ export interface UserSummary {
   isOnline: boolean;
 }
 
+export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
+
 export interface Message {
   id: number;
   content: string;
   timestamp: string;
   author: UserSummary;
+  type: MessageType;
 }
 
 

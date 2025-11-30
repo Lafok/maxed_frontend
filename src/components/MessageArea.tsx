@@ -93,6 +93,8 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
 
       const topic = `/topic/chats.${chatId}`;
       subscription = await websocketService.subscribe(topic, (newMessage: MessageType) => {
+        console.log("RECEIVED MESSAGE FROM WEBSOCKET:", newMessage);
+
         if (isMounted) {
           setMessages((prevMessages) => [...prevMessages, newMessage]);
         }
@@ -107,7 +109,6 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
         subscription.unsubscribe();
       }
     };
-
   }, [activeChat?.id, fetchMessages]);
 
   useEffect(() => {
@@ -136,6 +137,7 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
   const handleMessageAreaClick = () => {
     messageInputRef.current?.focus();
   };
+
 
   const partner = activeChat?.participants.find(p => p.username !== user?.sub);
   const chatPartnerName = activeChat ? (partner?.username || 'Group Chat') : 'Select a chat';
@@ -169,6 +171,7 @@ const MessageArea = ({ activeChat }: MessageAreaProps) => {
                   author={msg.author}
                   timestamp={msg.timestamp}
                   isOwnMessage={msg.author.username === user?.sub}
+                  type={msg.type}
               />
           ))}
         </>
