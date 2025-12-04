@@ -1,8 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { StompSubscription } from '@stomp/stompjs';
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 
 import api from '../services/api';
-import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
 import { Message as MessageType, Chat } from '../types';
 
@@ -14,13 +12,14 @@ const MESSAGES_PER_PAGE = 50;
 
 interface MessageAreaProps {
   activeChat: Chat | undefined;
+  messages: MessageType[];
+  setMessages: (messages: MessageType[] | ((prev: MessageType[]) => MessageType[])) => void;
   isDragging: boolean;
   openMediaModal: (files: File[]) => void;
   onMediaClick: (message: MessageType) => void;
 }
 
-const MessageArea = ({ activeChat, isDragging, openMediaModal, onMediaClick }: MessageAreaProps) => {
-  const [messages, setMessages] = useState<MessageType[]>([]);
+const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaModal, onMediaClick }: MessageAreaProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
@@ -54,7 +53,7 @@ const MessageArea = ({ activeChat, isDragging, openMediaModal, onMediaClick }: M
       setLoading(false);
       setIsFetchingOlderMessages(false);
     }
-  }, []);
+  }, [setMessages]);
 
   useEffect(() => {
     const chatId = activeChat?.id;
@@ -63,36 +62,23 @@ const MessageArea = ({ activeChat, isDragging, openMediaModal, onMediaClick }: M
       setLoading(false);
       return;
     }
-
-    let isMounted = true;
-    let subscription: StompSubscription | null = null;
-
-    const setupChat = async () => {
+    
+    (async () => {
       await fetchMessages(chatId, 0, true);
-      const topic = `/topic/chats.${chatId}`;
-      subscription = await websocketService.subscribe(topic, (newMessage: MessageType) => {
-        if (isMounted) setMessages(prev => [...prev, newMessage]);
-      });
-    };
+    })();
 
-    setupChat();
+  }, [activeChat?.id, fetchMessages, setMessages]);
 
-    return () => {
-      isMounted = false;
-      subscription?.unsubscribe();
-    };
-  }, [activeChat?.id, fetchMessages]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (messagesEndRef.current && page === 0) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView();
     }
   }, [messages, page]);
 
   const handleScroll = () => {
     if (messagesContainerRef.current?.scrollTop === 0 && hasMoreMessages && !isFetchingOlderMessages && activeChat) {
       prevScrollHeightRef.current = messagesContainerRef.current.scrollHeight;
-      fetchMessages(activeChat.id, page + 1, false);
+      fetchMessages(activeChat.id, page + 1, false).catch(console.error);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import ChatList from '../components/ChatList';
 import MessageArea from '../components/MessageArea';
 import websocketService from '../services/websocketService';
@@ -12,6 +12,7 @@ import MediaViewer from '../components/MediaViewer';
 const ChatPage = () => {
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
     const [chats, setChats] = useState<Chat[]>([]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const { user, token } = useAuth();
 
     const [isDragging, setIsDragging] = useState(false);
@@ -19,24 +20,24 @@ const ChatPage = () => {
     const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
     const dragCounter = useRef(0);
 
-    const fetchChats = async () => {
+    const fetchChats = useCallback(async () => {
         try {
             const response = await api.get('/chats');
             setChats(response.data);
         } catch (error) {
             console.error('Failed to fetch chats', error);
         }
-    };
+    }, []);
 
     useEffect(() => {
         if (token) {
             websocketService.connect(token);
-            fetchChats();
+            fetchChats().catch(console.error);
         }
         return () => {
             websocketService.disconnect();
         };
-    }, [token]);
+    }, [token, fetchChats]);
 
     useEffect(() => {
         if (!user?.sub) return;
@@ -56,9 +57,49 @@ const ChatPage = () => {
                 );
             });
         };
-        setupSubscription();
-        return () => subscription?.unsubscribe();
+        setupSubscription().catch(console.error);
+        return () => {
+            if (subscription) {
+                subscription.unsubscribe();
+            }
+        };
     }, [user?.sub]);
+
+    useEffect(() => {
+        const subscriptions: StompSubscription[] = [];
+
+        const setupMessageSubscriptions = async () => {
+            for (const chat of chats) {
+                const topic = `/topic/chats.${chat.id}`;
+                const subscription = await websocketService.subscribe(topic, (newMessage: Message) => {
+                    setChats(prevChats => {
+                        const chatToUpdate = prevChats.find(c => c.id === chat.id);
+                        if (!chatToUpdate) return prevChats;
+
+                        const updatedChat = { ...chatToUpdate, lastMessage: newMessage };
+                        const otherChats = prevChats.filter(c => c.id !== chat.id);
+                        return [updatedChat, ...otherChats];
+                    });
+
+                    if (chat.id === activeChatId) {
+                        setMessages(prev => [...prev, newMessage]);
+                    }
+                });
+                if (subscription) {
+                    subscriptions.push(subscription);
+                }
+            }
+        };
+
+        if (chats.length > 0) {
+            setupMessageSubscriptions().catch(console.error);
+        }
+
+        return () => {
+            subscriptions.forEach(sub => sub.unsubscribe());
+        };
+    }, [chats, activeChatId]);
+
 
     const activeChat = chats.find(chat => chat.id === activeChatId);
 
@@ -86,8 +127,12 @@ const ChatPage = () => {
         }
     };
 
+    const handleSetMessages = useCallback((newMessages: Message[] | ((prev: Message[]) => Message[])) => {
+        setMessages(newMessages);
+    }, []);
+
     return (
-        <div 
+        <div
             className="flex h-screen w-screen bg-gray-100 dark:bg-gray-900"
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
@@ -102,6 +147,8 @@ const ChatPage = () => {
             />
             <MessageArea
                 activeChat={activeChat}
+                messages={messages}
+                setMessages={handleSetMessages}
                 isDragging={isDragging}
                 openMediaModal={(files) => setModalFiles(files)}
                 onMediaClick={(message) => setViewingMessage(message)}
