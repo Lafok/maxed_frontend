@@ -1,33 +1,42 @@
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { UserSummary, MessageType } from '../types';
+import { MessageType, Message as MessagePropsType } from '../types';
 
-interface MessageProps {
-  content: string;
-  author: UserSummary;
-  timestamp: string;
+interface MessageProps extends MessagePropsType {
   isOwnMessage: boolean;
-  type: MessageType;
+  onMediaClick: (message: MessagePropsType) => void;
 }
 
-const MessageContent = ({ type, content }: { type: MessageType; content: string }) => {
+const MessageContent = ({ type, content, onMediaClick }: { type: MessageType; content: string; onMediaClick: () => void }) => {
+  const isMedia = type === 'IMAGE' || type === 'VIDEO';
+
+  const handleMediaClick = () => {
+    if (isMedia) {
+      onMediaClick();
+    }
+  };
+
   switch (type) {
     case 'IMAGE':
       return (
-        <a href={content} target="_blank" rel="noopener noreferrer">
-          <img src={content} alt="Uploaded content" className="max-w-xs max-h-64 rounded-lg cursor-pointer" />
-        </a>
+        <div onClick={handleMediaClick} className="cursor-pointer">
+          <img src={content} alt="Uploaded content" className="max-w-xs max-h-80 rounded-lg" />
+        </div>
       );
     case 'VIDEO':
       return (
-        <video controls className="max-w-xs rounded-lg">
-          <source src={content} />
-          Your browser does not support the video tag.
-        </video>
+        <div onClick={handleMediaClick} className="cursor-pointer relative">
+          <video src={content} className="max-w-xs max-h-80 rounded-lg" />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path></svg>
+            </div>
+          </div>
+        </div>
       );
     case 'AUDIO':
       return (
-        <audio controls src={content}>
+        <audio controls src={content} className="w-full max-w-xs">
           Your browser does not support the audio element.
         </audio>
       );
@@ -43,12 +52,13 @@ const MessageContent = ({ type, content }: { type: MessageType; content: string 
   }
 };
 
-const Message = ({ content, author, timestamp, isOwnMessage, type }: MessageProps) => {
+const Message = (props: MessageProps) => {
+  const { content, author, timestamp, isOwnMessage, type, onMediaClick } = props;
   const messageContainerClasses = clsx('flex mb-4', isOwnMessage ? 'justify-end' : 'justify-start');
   
   const messageBubbleClasses = clsx(
     'rounded-2xl max-w-lg overflow-hidden',
-    isOwnMessage ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-800',
+    isOwnMessage ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white',
     type === 'TEXT' && 'py-2 px-4 whitespace-pre-wrap break-words'
   );
 
@@ -60,7 +70,7 @@ const Message = ({ content, author, timestamp, isOwnMessage, type }: MessageProp
           <span className="text-xs text-gray-500 dark:text-gray-500">{format(new Date(timestamp), 'p')}</span>
         </div>
         <div className={messageBubbleClasses}>
-          <MessageContent type={type} content={content} />
+          <MessageContent type={type} content={content} onMediaClick={() => onMediaClick(props)} />
         </div>
       </div>
     </div>
