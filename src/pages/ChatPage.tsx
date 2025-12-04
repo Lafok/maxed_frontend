@@ -20,6 +20,8 @@ const ChatPage = () => {
     const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
     const dragCounter = useRef(0);
 
+    const subscriptions = useRef<Map<string, StompSubscription>>(new Map());
+
     const fetchChats = useCallback(async () => {
         try {
             const response = await api.get('/chats');
@@ -32,73 +34,88 @@ const ChatPage = () => {
     useEffect(() => {
         if (token) {
             websocketService.connect(token);
-            fetchChats().catch(console.error);
+            fetchChats();
         }
         return () => {
             websocketService.disconnect();
         };
     }, [token, fetchChats]);
 
+    const subscribeToMessages = useCallback((chatId: number) => {
+        const topic = `/topic/chats.${chatId}`;
+        if (subscriptions.current.has(topic)) return;
+
+        websocketService.subscribe(topic, (newMessage: Message) => {
+            setChats(prevChats => {
+                const chatToUpdate = prevChats.find(c => c.id === chatId);
+                if (!chatToUpdate) return prevChats;
+
+                const updatedChat = { ...chatToUpdate, latestMessage: newMessage };
+                const otherChats = prevChats.filter(c => c.id !== chatId);
+                return [updatedChat, ...otherChats];
+            });
+
+            if (chatId === activeChatId) {
+                setMessages(prev => [...prev, newMessage]);
+            }
+        }).then(sub => {
+            if (sub) {
+                subscriptions.current.set(topic, sub);
+            }
+        });
+    }, [activeChatId]);
+
     useEffect(() => {
-        if (!user?.sub) return;
-        let subscription: StompSubscription | null = null;
-        const setupSubscription = async () => {
-            subscription = await websocketService.subscribe('/topic/presence', (message: StatusUpdateMessage) => {
+        chats.forEach(chat => subscribeToMessages(chat.id));
+    }, [chats, subscribeToMessages]);
+
+    useEffect(() => {
+        if (!user?.sub || !token) return;
+
+        const setupGlobalSubscriptions = async () => {
+            const presenceTopic = '/topic/presence';
+            const presenceSub = await websocketService.subscribe(presenceTopic, (message: StatusUpdateMessage) => {
                 setChats(prevChats =>
                     prevChats.map(chat => {
-                        const partner = chat.participants.find(p => p.id === message.userId && p.username !== user?.sub);
-                        if (partner) {
-                            const updatedPartner = { ...partner, isOnline: message.isOnline };
-                            const updatedParticipants = chat.participants.map(p => p.id === message.userId ? updatedPartner : p);
+                        const participantToUpdate = chat.participants.find(p => p.id === message.userId);
+                        if (participantToUpdate) {
+                            const updatedParticipants = chat.participants.map(p =>
+                                p.id === message.userId ? { ...p, isOnline: message.isOnline } : p
+                            );
                             return { ...chat, participants: updatedParticipants };
                         }
                         return chat;
                     })
                 );
             });
-        };
-        setupSubscription().catch(console.error);
-        return () => {
-            if (subscription) {
-                subscription.unsubscribe();
-            }
-        };
-    }, [user?.sub]);
+            if (presenceSub) subscriptions.current.set(presenceTopic, presenceSub);
 
-    useEffect(() => {
-        const subscriptions: StompSubscription[] = [];
-
-        const setupMessageSubscriptions = async () => {
-            for (const chat of chats) {
-                const topic = `/topic/chats.${chat.id}`;
-                const subscription = await websocketService.subscribe(topic, (newMessage: Message) => {
-                    setChats(prevChats => {
-                        const chatToUpdate = prevChats.find(c => c.id === chat.id);
-                        if (!chatToUpdate) return prevChats;
-
-                        const updatedChat = { ...chatToUpdate, lastMessage: newMessage };
-                        const otherChats = prevChats.filter(c => c.id !== chat.id);
-                        return [updatedChat, ...otherChats];
-                    });
-
-                    if (chat.id === activeChatId) {
-                        setMessages(prev => [...prev, newMessage]);
+            const newChatTopic = `/topic/users.${user.sub}.chats`;
+            
+            const newChatSub = await websocketService.subscribe(newChatTopic, (newChat: Chat) => {
+                console.log('🔥 New chat received via WebSocket:', newChat);
+                
+                setChats(prevChats => {
+                    if (prevChats.find(c => c.id === newChat.id)) {
+                        return prevChats;
                     }
+                    
+                    subscribeToMessages(newChat.id);
+                    
+                    return [newChat, ...prevChats];
                 });
-                if (subscription) {
-                    subscriptions.push(subscription);
-                }
-            }
+            });
+            if (newChatSub) subscriptions.current.set(newChatTopic, newChatSub);
         };
 
-        if (chats.length > 0) {
-            setupMessageSubscriptions().catch(console.error);
-        }
+        setupGlobalSubscriptions();
 
         return () => {
-            subscriptions.forEach(sub => sub.unsubscribe());
+            console.log('Cleaning up global subscriptions');
+            subscriptions.current.forEach(sub => sub.unsubscribe());
+            subscriptions.current.clear();
         };
-    }, [chats, activeChatId]);
+    }, [user?.sub, token, subscribeToMessages]);
 
 
     const activeChat = chats.find(chat => chat.id === activeChatId);
