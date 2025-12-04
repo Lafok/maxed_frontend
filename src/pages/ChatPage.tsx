@@ -93,7 +93,7 @@ const ChatPage = () => {
             const newChatTopic = `/topic/users.${user.sub}.chats`;
             
             const newChatSub = await websocketService.subscribe(newChatTopic, (newChat: Chat) => {
-                console.log('🔥 New chat received via WebSocket:', newChat);
+                console.log('New chat received via WebSocket:', newChat);
                 
                 setChats(prevChats => {
                     if (prevChats.find(c => c.id === newChat.id)) {
