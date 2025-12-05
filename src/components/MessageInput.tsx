@@ -15,6 +15,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeCha
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
@@ -26,11 +28,42 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeCha
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value);
+
+    if (activeChatId) {
+      if (!isTypingRef.current) {
+        isTypingRef.current = true;
+        const payload = { chatId: activeChatId, isTyping: true };
+        websocketService.sendMessage(`/app/chat.typing/${activeChatId}`, payload);
+      }
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        isTypingRef.current = false;
+        const payload = { chatId: activeChatId, isTyping: false };
+        websocketService.sendMessage(`/app/chat.typing/${activeChatId}`, payload);
+      }, 2000);
+    }
+  };
+
   const handleSend = async () => {
     if (text.trim() && activeChatId) {
       const destination = `/app/chat.sendMessage/${activeChatId}`;
       const body = { content: text, type: 'TEXT' as MessageType };
       await websocketService.sendMessage(destination, body);
+      
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        const payload = { chatId: activeChatId, isTyping: false };
+        websocketService.sendMessage(`/app/chat.typing/${activeChatId}`, payload);
+      }
+
       setText('');
       textareaRef.current?.focus();
     }
@@ -59,7 +92,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ activeCha
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           className="flex-grow p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white resize-none"

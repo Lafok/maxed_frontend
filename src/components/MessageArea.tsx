@@ -1,14 +1,19 @@
 import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
-
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { Message as MessageType, Chat } from '../types';
-
 import Message from './Message';
 import MessageInput, { MessageInputRef } from './MessageInput';
 import Spinner from './Spinner';
+import websocketService from '../services/websocketService';
 
 const MESSAGES_PER_PAGE = 50;
+
+interface TypingEvent {
+    chatId: number;
+    username: string;
+    isTyping: boolean;
+}
 
 interface MessageAreaProps {
   activeChat: Chat | undefined;
@@ -24,6 +29,7 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isFetchingOlderMessages, setIsFetchingOlderMessages] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
 
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -62,12 +68,40 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
       setLoading(false);
       return;
     }
-    
-    (async () => {
-      await fetchMessages(chatId, 0, true);
-    })();
-
+    fetchMessages(chatId, 0, true);
   }, [activeChat?.id, fetchMessages, setMessages]);
+
+  useEffect(() => {
+    const chatId = activeChat?.id;
+    if (!chatId || !user?.sub) return;
+
+    const typingTopic = `/topic/chats.${chatId}.typing`;
+    
+    const subPromise = websocketService.subscribe(typingTopic, (event: TypingEvent) => {
+        if (event.username === user.sub) {
+            return;
+        }
+
+        setTypingUsers(prev => {
+            const newSet = new Set(prev);
+            if (event.isTyping) {
+                newSet.add(event.username);
+            } else {
+                newSet.delete(event.username);
+            }
+            return newSet;
+        });
+    });
+
+    return () => {
+       subPromise.then(subscription => {
+         if (subscription) {
+           subscription.unsubscribe();
+         }
+       });
+       setTypingUsers(new Set());
+    };
+  }, [activeChat?.id, user?.sub]);
 
   useLayoutEffect(() => {
     if (messagesEndRef.current && page === 0) {
@@ -86,6 +120,21 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
   const chatPartnerName = activeChat ? (partner?.username || 'Group Chat') : 'Select a chat';
   const isPartnerOnline = partner?.isOnline ?? false;
 
+  const renderStatus = () => {
+    const typingNames = Array.from(typingUsers);
+    if (typingNames.length > 0) {
+      return (
+        <p className="text-sm text-indigo-400 animate-pulse h-4">
+          {typingNames.join(', ')} is typing...
+        </p>
+      );
+    }
+    if (isPartnerOnline) {
+      return <p className="text-sm text-gray-400 h-4">online</p>;
+    }
+    return <div className="h-4" />;
+  };
+
   return (
     <div className="flex-grow flex flex-col bg-gray-100 dark:bg-gray-900 relative">
       {isDragging && (
@@ -97,13 +146,16 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
       )}
 
       <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-10">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
-          {chatPartnerName}
-          {isPartnerOnline && <span className="ml-2 w-3 h-3 bg-green-500 rounded-full"></span>}
-        </h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+            {chatPartnerName}
+          </h2>
+          {activeChat && renderStatus()}
+        </div>
       </div>
 
       <div ref={messagesContainerRef} className="flex-grow p-4 overflow-y-auto" onScroll={handleScroll} onClick={() => messageInputRef.current?.focus()}>
+        {isFetchingOlderMessages && <div className="flex justify-center my-2"><Spinner /></div>}
         {loading ? <div className="flex items-center justify-center h-full"><Spinner /></div> : messages.map(msg => <Message key={msg.id} {...msg} isOwnMessage={msg.author.username === user?.sub} onMediaClick={onMediaClick} />)}
         <div ref={messagesEndRef} />
       </div>
