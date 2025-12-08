@@ -22,9 +22,10 @@ interface MessageAreaProps {
   isDragging: boolean;
   openMediaModal: (files: File[]) => void;
   onMediaClick: (message: MessageType) => void;
+  onSearchClick: () => void;
 }
 
-const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaModal, onMediaClick }: MessageAreaProps) => {
+const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaModal, onMediaClick, onSearchClick }: MessageAreaProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [page, setPage] = useState(0);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
@@ -145,13 +146,20 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
         </div>
       )}
 
-      <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-10">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 z-10">
         <div>
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">
             {chatPartnerName}
           </h2>
           {activeChat && renderStatus()}
         </div>
+        {activeChat && (
+            <button onClick={onSearchClick} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
+        )}
       </div>
 
       <div ref={messagesContainerRef} className="flex-grow p-4 overflow-y-auto" onScroll={handleScroll} onClick={() => messageInputRef.current?.focus()}>
