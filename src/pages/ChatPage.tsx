@@ -8,6 +8,7 @@ import api from '../services/api';
 import { StompSubscription } from '@stomp/stompjs';
 import SendMediaModal from '../components/SendMediaModal';
 import MediaViewer from '../components/MediaViewer';
+import searchService, { SearchResultMessage } from '../services/searchService';
 
 const ChatPage = () => {
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
@@ -20,7 +21,14 @@ const ChatPage = () => {
     const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
     const dragCounter = useRef(0);
 
+    const [isSearchVisible, setIsSearchVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Message[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     const subscriptions = useRef<Map<string, StompSubscription>>(new Map());
+
+    const activeChat = chats.find(chat => chat.id === activeChatId);
 
     const fetchChats = useCallback(async () => {
         try {
@@ -117,8 +125,44 @@ const ChatPage = () => {
         };
     }, [user?.sub, token, subscribeToMessages]);
 
+    const handleSearch = async (query: string) => {
+        setSearchQuery(query);
+        if (!activeChat) return;
+        
+        if (query.trim() === '') {
+            setSearchResults([]);
+            return;
+        }
 
-    const activeChat = chats.find(chat => chat.id === activeChatId);
+        setIsSearching(true);
+        try {
+            const results: SearchResultMessage[] = await searchService.searchMessages(activeChat.id, query);
+            
+            const hydratedResults: Message[] = results.map(message => {
+                const author = activeChat.participants.find(p => p.id === message.authorId);
+                return {
+                    id: parseInt(message.id, 10),
+                    content: message.content,
+                    timestamp: message.timestamp,
+                    author: author || { id: message.authorId, username: 'Unknown User', isOnline: false },
+                    type: 'TEXT',
+                };
+            });
+
+            setSearchResults(hydratedResults);
+        } catch (error) {
+            console.error('Search failed', error);
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleToggleSearch = () => {
+        setIsSearchVisible(prev => !prev);
+        setSearchQuery('');
+        setSearchResults([]);
+    };
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault(); e.stopPropagation();
@@ -161,6 +205,12 @@ const ChatPage = () => {
                 setChats={setChats}
                 activeChatId={activeChatId}
                 setActiveChatId={setActiveChatId}
+                isSearchVisible={isSearchVisible}
+                searchQuery={searchQuery}
+                onSearchQueryChange={handleSearch}
+                searchResults={searchResults}
+                isSearching={isSearching}
+                onCloseSearch={handleToggleSearch}
             />
             <MessageArea
                 activeChat={activeChat}
@@ -169,6 +219,7 @@ const ChatPage = () => {
                 isDragging={isDragging}
                 openMediaModal={(files) => setModalFiles(files)}
                 onMediaClick={(message) => setViewingMessage(message)}
+                onSearchClick={handleToggleSearch}
             />
             {modalFiles.length > 0 && activeChatId && (
                 <SendMediaModal
