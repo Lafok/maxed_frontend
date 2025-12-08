@@ -102,35 +102,41 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
 
   useEffect(() => {
     const chatId = activeChat?.id;
-    if (!chatId || !user) return;
-
-    const markAsRead = () => {
-        const hasUnread = messages.some(
-            m => m.status === MessageStatus.SENT && m.author.username !== user.sub
-        );
-
-        if (hasUnread) {
-            websocketService.sendMessage(`/app/chat.read/${chatId}`, {});
-        }
-    };
-
-    const timer = setTimeout(markAsRead, 500);
+    if (!chatId || !user?.sub) return;
 
     const readTopic = `/topic/chats.${chatId}.read`;
     const readSubPromise = websocketService.subscribe(readTopic, (event: ReadEvent) => {
         const currentUser = activeChat.participants.find(p => p.username === user.sub);
         if (event.userId !== currentUser?.id) {
              setMessages(prev => prev.map(msg => 
-                 msg.author.username === user.sub ? { ...msg, status: MessageStatus.READ } : msg
+                 msg.author.username === user.sub && msg.status === MessageStatus.SENT 
+                    ? { ...msg, status: MessageStatus.READ } 
+                    : msg
              ));
         }
     });
 
     return () => {
-        clearTimeout(timer);
         readSubPromise.then(sub => sub?.unsubscribe());
     };
-  }, [activeChat, messages, user, setMessages]);
+  }, [activeChat?.id, user?.sub, setMessages, activeChat?.participants]);
+
+  useEffect(() => {
+    const chatId = activeChat?.id;
+    if (!chatId || !user?.sub) return;
+
+    const hasUnread = messages.some(
+        m => m.status === MessageStatus.SENT && m.author.username !== user.sub
+    );
+
+    if (hasUnread) {
+        const timer = setTimeout(() => {
+            websocketService.sendMessage(`/app/chat.read/${chatId}`, {});
+        }, 500);
+        return () => clearTimeout(timer);
+    }
+  }, [messages, activeChat?.id, user?.sub]);
+
 
   useLayoutEffect(() => {
     if (messagesEndRef.current && page === 0) {
