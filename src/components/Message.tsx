@@ -104,7 +104,7 @@ const Message = (props: MessageProps) => {
     const { isOwnMessage } = props;
 
     const messageBubbleClasses = clsx(
-        'rounded-xl max-w-[80%] sm:max-w-lg relative shadow-sm', // `relative` здесь — это ключ к работе `position: absolute`
+        'rounded-xl max-w-[80%] sm:max-w-lg relative shadow-sm',
         isOwnMessage ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-800 dark:text-white',
     );
 
