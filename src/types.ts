@@ -11,12 +11,18 @@ export interface UserSummary {
 
 export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
 
+export enum MessageStatus {
+    SENT = 'SENT',
+    READ = 'READ'
+}
+
 export interface Message {
   id: number;
   content: string;
   timestamp: string;
   author: UserSummary;
   type: MessageType;
+  status: MessageStatus;
 }
 
 

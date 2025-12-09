@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { Message as MessageType, Chat } from '../types';
+import { Message as MessageType, Chat, MessageStatus } from '../types';
 import Message from './Message';
 import MessageInput, { MessageInputRef } from './MessageInput';
 import Spinner from './Spinner';
@@ -13,6 +13,11 @@ interface TypingEvent {
     chatId: number;
     username: string;
     isTyping: boolean;
+}
+
+interface ReadEvent {
+    chatId: number;
+    userId: number;
 }
 
 interface MessageAreaProps {
@@ -79,30 +84,59 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
     const typingTopic = `/topic/chats.${chatId}.typing`;
     
     const subPromise = websocketService.subscribe(typingTopic, (event: TypingEvent) => {
-        if (event.username === user.sub) {
-            return;
-        }
+        if (event.username === user.sub) return;
 
         setTypingUsers(prev => {
             const newSet = new Set(prev);
-            if (event.isTyping) {
-                newSet.add(event.username);
-            } else {
-                newSet.delete(event.username);
-            }
+            if (event.isTyping) newSet.add(event.username);
+            else newSet.delete(event.username);
             return newSet;
         });
     });
 
     return () => {
-       subPromise.then(subscription => {
-         if (subscription) {
-           subscription.unsubscribe();
-         }
-       });
+       subPromise.then(subscription => subscription?.unsubscribe());
        setTypingUsers(new Set());
     };
   }, [activeChat?.id, user?.sub]);
+
+  useEffect(() => {
+    const chatId = activeChat?.id;
+    if (!chatId || !user?.sub) return;
+
+    const readTopic = `/topic/chats.${chatId}.read`;
+    const readSubPromise = websocketService.subscribe(readTopic, (event: ReadEvent) => {
+        const currentUser = activeChat.participants.find(p => p.username === user.sub);
+        if (event.userId !== currentUser?.id) {
+             setMessages(prev => prev.map(msg => 
+                 msg.author.username === user.sub && msg.status === MessageStatus.SENT 
+                    ? { ...msg, status: MessageStatus.READ } 
+                    : msg
+             ));
+        }
+    });
+
+    return () => {
+        readSubPromise.then(sub => sub?.unsubscribe());
+    };
+  }, [activeChat?.id, user?.sub, setMessages, activeChat?.participants]);
+
+  useEffect(() => {
+    const chatId = activeChat?.id;
+    if (!chatId || !user?.sub) return;
+
+    const hasUnread = messages.some(
+        m => m.status === MessageStatus.SENT && m.author.username !== user.sub
+    );
+
+    if (hasUnread) {
+        const timer = setTimeout(() => {
+            websocketService.sendMessage(`/app/chat.read/${chatId}`, {});
+        }, 500);
+        return () => clearTimeout(timer);
+    }
+  }, [messages, activeChat?.id, user?.sub]);
+
 
   useLayoutEffect(() => {
     if (messagesEndRef.current && page === 0) {
