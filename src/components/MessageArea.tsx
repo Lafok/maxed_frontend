@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { Message as MessageType, Chat, MessageStatus } from '../types';
@@ -6,6 +6,8 @@ import Message from './Message';
 import MessageInput, { MessageInputRef } from './MessageInput';
 import Spinner from './Spinner';
 import websocketService from '../services/websocketService';
+import DateSeparator from './DateSeparator';
+import { formatDateSeparator } from '../utils/formatDate';
 
 const MESSAGES_PER_PAGE = 50;
 
@@ -139,8 +141,14 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
 
 
   useLayoutEffect(() => {
-    if (messagesEndRef.current && page === 0) {
-      messagesEndRef.current.scrollIntoView();
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    if (page > 0 && prevScrollHeightRef.current > 0) {
+      container.scrollTop = container.scrollHeight - prevScrollHeightRef.current;
+      prevScrollHeightRef.current = 0;
+    } else if (page === 0) {
+      messagesEndRef.current?.scrollIntoView();
     }
   }, [messages, page]);
 
@@ -168,6 +176,29 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
       return <p className="text-sm text-gray-400 h-4">online</p>;
     }
     return <div className="h-4" />;
+  };
+
+  const renderMessagesWithSeparators = () => {
+    const messageElements: React.ReactNode[] = [];
+    let lastDate: string | null = null;
+
+    messages.forEach(msg => {
+      const messageDate = new Date(msg.timestamp);
+      const messageDateString = messageDate.toDateString();
+
+      if (messageDateString !== lastDate) {
+        messageElements.push(
+          <DateSeparator key={`sep-${messageDateString}`} date={formatDateSeparator(messageDate)} />
+        );
+        lastDate = messageDateString;
+      }
+
+      messageElements.push(
+        <Message key={msg.id} {...msg} isOwnMessage={msg.author.username === user?.sub} onMediaClick={onMediaClick} />
+      );
+    });
+
+    return messageElements;
   };
 
   return (
@@ -198,7 +229,7 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
 
       <div ref={messagesContainerRef} className="flex-grow p-4 overflow-y-auto" onScroll={handleScroll} onClick={() => messageInputRef.current?.focus()}>
         {isFetchingOlderMessages && <div className="flex justify-center my-2"><Spinner /></div>}
-        {loading ? <div className="flex items-center justify-center h-full"><Spinner /></div> : messages.map(msg => <Message key={msg.id} {...msg} isOwnMessage={msg.author.username === user?.sub} onMediaClick={onMediaClick} />)}
+        {loading ? <div className="flex items-center justify-center h-full"><Spinner /></div> : renderMessagesWithSeparators()}
         <div ref={messagesEndRef} />
       </div>
 
