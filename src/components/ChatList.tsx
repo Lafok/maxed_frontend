@@ -6,6 +6,7 @@ import GenericInput from './GenericInput';
 import Spinner from './Spinner';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { formatChatListTime } from '../utils/formatDate';
 
 const getInitials = (name: string) => {
     const names = name.split(' ');
@@ -141,18 +142,23 @@ const ChatList = ({
         <div
           key={chat.id}
           className={clsx(
-            "flex items-center p-3 rounded-md cursor-pointer transition-colors mx-2 my-1",
+            "flex items-start p-3 rounded-md cursor-pointer transition-colors mx-2 my-1",
             activeChatId === chat.id ? 'bg-indigo-600 text-white' : 'hover:bg-gray-700'
           )}
           onClick={() => setActiveChatId(chat.id)}
         >
           <Avatar name={partner?.username || 'Group Chat'} isOnline={isPartnerOnline} />
-          <div className="ml-3 truncate">
+          <div className="ml-3 truncate flex-grow">
             <p className="font-semibold">{partner?.username || 'Group Chat'}</p>
             <p className="text-sm text-gray-400 truncate">
               {chat.latestMessage?.content || 'No messages yet'}
             </p>
           </div>
+          {chat.latestMessage && (
+            <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+              {formatChatListTime(chat.latestMessage.timestamp)}
+            </span>
+          )}
         </div>
       );
     });

@@ -1,5 +1,4 @@
 import clsx from 'clsx';
-import { format } from 'date-fns';
 import type { Message as MessagePropsType } from '../types';
 import MessageStatusIcon from './MessageStatusIcon';
 
@@ -8,13 +7,22 @@ interface MessageProps extends MessagePropsType {
   onMediaClick: (message: MessagePropsType) => void;
 }
 
+const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+    }).format(date);
+}
+
 const TimeAndStatus = ({ timestamp, status, isOwnMessage }: { timestamp: string, status: MessagePropsType['status'], isOwnMessage: boolean }) => (
     <div className={clsx(
         "flex items-center gap-1",
         isOwnMessage ? "text-white/90" : "text-gray-500 dark:text-gray-400"
     )}>
         <span className="text-xs select-none">
-            {format(new Date(timestamp), 'p')}
+            {formatTime(timestamp)}
         </span>
         <MessageStatusIcon status={status} isOwnMessage={isOwnMessage} />
     </div>
@@ -53,7 +61,7 @@ const MediaMessage = (props: MessageProps) => {
                 </>
             )}
             <div className="absolute right-1.5 bottom-1 flex items-center gap-1 bg-black/40 text-white rounded-full px-2 py-0.5 pointer-events-none">
-                <span className="text-xs">{format(new Date(props.timestamp), 'p')}</span>
+                <span className="text-xs">{formatTime(props.timestamp)}</span>
                 <MessageStatusIcon status={props.status} isOwnMessage={props.isOwnMessage} />
             </div>
         </div>
