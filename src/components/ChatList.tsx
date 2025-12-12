@@ -1,39 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { Chat, UserSummary, Message } from '../types';
+import { Chat, UserSummary, Message, User } from '../types';
 import GenericInput from './GenericInput';
 import Spinner from './Spinner';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { formatChatListTime } from '../utils/formatDate';
-
-const getInitials = (name: string) => {
-    const names = name.split(' ');
-    if (names.length > 1) {
-        return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-};
-
-const Avatar = ({ name, isOnline }: { name: string; isOnline: boolean }) => (
-    <div className="relative w-10 h-10 flex-shrink-0">
-        <div className="w-full h-full rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm">
-            {getInitials(name)}
-        </div>
-        {isOnline && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
-        )}
-    </div>
-);
-
-interface User {
-    id: number;
-    username: string;
-    email: string;
-    role: string;
-    isOnline: boolean;
-}
+import Avatar from './Avatar';
 
 interface ChatListProps {
   chats: Chat[];
@@ -62,7 +36,7 @@ const ChatList = ({
 }: ChatListProps) => {
   const { user } = useAuth();
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
+  const [userSearchResults, setUserSearchResults] = useState<UserSummary[]>([]);
   const [isLoadingUserSearch, setIsLoadingUserSearch] = useState(false);
   const [userSearchError, setUserSearchError] = useState<string | null>(null);
   const debounceTimeout = useRef<number | null>(null);
@@ -84,7 +58,7 @@ const ChatList = ({
 
     debounceTimeout.current = window.setTimeout(async () => {
         try {
-            const response = await api.get('/users/search', { params: { name: userSearchQuery } });
+            const response = await api.get<UserSummary[]>('/users/search', { params: { name: userSearchQuery } });
             setUserSearchResults(response.data);
             if (response.data.length === 0) {
                 setUserSearchError('No users found matching your search.');
@@ -103,17 +77,32 @@ const ChatList = ({
   }, [userSearchQuery, isSearchVisible]);
 
   const getPartner = (participants: UserSummary[]) => {
-    return participants.find(p => p.username !== user?.sub);
+    return participants.find(p => p.username !== user?.username);
   };
 
   const handleCreateChat = async (userId: number) => {
     try {
-      const response = await api.post('/chats/direct', { partnerId: userId });
+      const response = await api.post<Chat>('/chats/direct', { partnerId: userId });
       const newChat = response.data;
       
       setChats(prevChats => {
         const chatExists = prevChats.some(chat => chat.id === newChat.id);
         if (!chatExists) {
+            const newParticipant = newChat.participants.find(p => p.id === userId);
+            if (newParticipant) {
+                api.get<User>(`/users/${userId}`).then(userResponse => {
+                    const userWithAvatar = userResponse.data;
+                    setChats(prev => prev.map(chat => {
+                        if (chat.id === newChat.id) {
+                            return {
+                                ...chat,
+                                participants: chat.participants.map(p => p.id === userId ? { ...p, avatarUrl: userWithAvatar.avatarUrl } : p)
+                            };
+                        }
+                        return chat;
+                    }));
+                });
+            }
           return [newChat, ...prevChats];
         }
         return prevChats;
@@ -147,7 +136,11 @@ const ChatList = ({
           )}
           onClick={() => setActiveChatId(chat.id)}
         >
-          <Avatar name={partner?.username || 'Group Chat'} isOnline={isPartnerOnline} />
+          <Avatar 
+            username={partner?.username || 'Group Chat'} 
+            avatarUrl={partner?.avatarUrl}
+            isOnline={isPartnerOnline} 
+          />
           <div className="ml-3 truncate flex-grow">
             <p className="font-semibold">{partner?.username || 'Group Chat'}</p>
             <p className="text-sm text-gray-400 truncate">
@@ -184,7 +177,7 @@ const ChatList = ({
         className="flex items-center gap-4 p-3 mx-2 my-1 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors"
         onClick={() => handleCreateChat(user.id)}
       >
-        <Avatar name={user.username} isOnline={user.isOnline} />
+        <Avatar username={user.username} avatarUrl={user.avatarUrl} isOnline={user.isOnline} />
         <span className="font-medium text-gray-200">{user.username}</span>
       </div>
     ));

@@ -3,12 +3,13 @@ import ChatList from '../components/ChatList';
 import MessageArea from '../components/MessageArea';
 import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
-import { Chat, StatusUpdateMessage, Message } from '../types';
+import { Chat, StatusUpdateMessage, Message, UserUpdateMessage, User } from '../types';
 import api from '../services/api';
 import { StompSubscription } from '@stomp/stompjs';
 import SendMediaModal from '../components/SendMediaModal';
 import MediaViewer from '../components/MediaViewer';
 import searchService, { SearchResultMessage } from '../services/searchService';
+import Sidebar from '../components/Sidebar';
 
 const ChatPage = () => {
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
@@ -32,10 +33,27 @@ const ChatPage = () => {
 
     const fetchChats = useCallback(async () => {
         try {
-            const response = await api.get('/chats');
-            setChats(response.data);
+            const [chatsResponse, usersResponse] = await Promise.all([
+                api.get<Chat[]>('/chats'),
+                api.get<User[]>('/users')
+            ]);
+            
+            const usersById = new Map(usersResponse.data.map(u => [u.id, u]));
+
+            const chatsWithAvatars = chatsResponse.data.map(chat => ({
+                ...chat,
+                participants: chat.participants.map(p => {
+                    const userWithAvatar = usersById.get(p.id);
+                    return {
+                        ...p,
+                        avatarUrl: userWithAvatar?.avatarUrl || p.avatarUrl,
+                    };
+                })
+            }));
+
+            setChats(chatsWithAvatars);
         } catch (error) {
-            console.error('Failed to fetch chats', error);
+            console.error('Failed to fetch chats or users', error);
         }
     }, []);
 
@@ -78,7 +96,7 @@ const ChatPage = () => {
     }, [chats, subscribeToMessages]);
 
     useEffect(() => {
-        if (!user?.sub || !token) return;
+        if (!user?.id || !token) return;
 
         const setupGlobalSubscriptions = async () => {
             const presenceTopic = '/topic/presence';
@@ -98,7 +116,7 @@ const ChatPage = () => {
             });
             if (presenceSub) subscriptions.current.set(presenceTopic, presenceSub);
 
-            const newChatTopic = `/topic/users.${user.sub}.chats`;
+            const newChatTopic = `/topic/users.${user.id}.chats`;
             
             const newChatSub = await websocketService.subscribe(newChatTopic, (newChat: Chat) => {
                 console.log('New chat received via WebSocket:', newChat);
@@ -114,6 +132,23 @@ const ChatPage = () => {
                 });
             });
             if (newChatSub) subscriptions.current.set(newChatTopic, newChatSub);
+
+            const userUpdateTopic = '/topic/users.updates';
+            const userUpdateSub = await websocketService.subscribe(userUpdateTopic, (message: UserUpdateMessage) => {
+                setChats(prevChats =>
+                    prevChats.map(chat => {
+                        const participantToUpdate = chat.participants.find(p => p.id === message.id);
+                        if (participantToUpdate) {
+                            const updatedParticipants = chat.participants.map(p =>
+                                p.id === message.id ? { ...p, username: message.username, avatarUrl: message.avatarUrl, isOnline: message.isOnline } : p
+                            );
+                            return { ...chat, participants: updatedParticipants };
+                        }
+                        return chat;
+                    })
+                );
+            });
+            if (userUpdateSub) subscriptions.current.set(userUpdateTopic, userUpdateSub);
         };
 
         setupGlobalSubscriptions();
@@ -123,7 +158,7 @@ const ChatPage = () => {
             subscriptions.current.forEach(sub => sub.unsubscribe());
             subscriptions.current.clear();
         };
-    }, [user?.sub, token, subscribeToMessages]);
+    }, [user?.id, token, subscribeToMessages]);
 
     const handleSearch = async (query: string) => {
         setSearchQuery(query);
@@ -146,6 +181,7 @@ const ChatPage = () => {
                     timestamp: message.timestamp,
                     author: author || { id: message.authorId, username: 'Unknown User', isOnline: false },
                     type: 'TEXT',
+                    status: 'SENT' // Assuming default status
                 };
             });
 
@@ -200,6 +236,7 @@ const ChatPage = () => {
             onDragOver={handleDragOver}
             onDrop={handleDrop}
         >
+            <Sidebar />
             <ChatList
                 chats={chats}
                 setChats={setChats}
