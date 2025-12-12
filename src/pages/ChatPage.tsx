@@ -9,7 +9,6 @@ import { StompSubscription } from '@stomp/stompjs';
 import SendMediaModal from '../components/SendMediaModal';
 import MediaViewer from '../components/MediaViewer';
 import searchService, { SearchResultMessage } from '../services/searchService';
-import Sidebar from '../components/Sidebar';
 
 const ChatPage = () => {
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
@@ -76,8 +75,8 @@ const ChatPage = () => {
                 const chatToUpdate = prevChats.find(c => c.id === chatId);
                 if (!chatToUpdate) return prevChats;
 
-                const updatedChat = { ...chatToUpdate, latestMessage: newMessage };
                 const otherChats = prevChats.filter(c => c.id !== chatId);
+                const updatedChat = { ...chatToUpdate, latestMessage: newMessage };
                 return [updatedChat, ...otherChats];
             });
 
@@ -118,16 +117,24 @@ const ChatPage = () => {
 
             const newChatTopic = `/topic/users.${user.id}.chats`;
             
-            const newChatSub = await websocketService.subscribe(newChatTopic, (newChat: Chat) => {
-                console.log('New chat received via WebSocket:', newChat);
+            const newChatSub = await websocketService.subscribe(newChatTopic, async (newChat: Chat) => {
+                const partner = newChat.participants.find(p => p.id !== user.id);
+                if (partner) {
+                    try {
+                        const userResponse = await api.get<User>(`/users/${partner.id}`);
+                        newChat.participants = newChat.participants.map(p =>
+                            p.id === partner.id ? { ...p, avatarUrl: userResponse.data.avatarUrl } : p
+                        );
+                    } catch (error) {
+                        console.error(`Failed to fetch avatar for user ${partner.id}`, error);
+                    }
+                }
                 
                 setChats(prevChats => {
                     if (prevChats.find(c => c.id === newChat.id)) {
                         return prevChats;
                     }
-                    
                     subscribeToMessages(newChat.id);
-                    
                     return [newChat, ...prevChats];
                 });
             });
@@ -181,7 +188,8 @@ const ChatPage = () => {
                     timestamp: message.timestamp,
                     author: author || { id: message.authorId, username: 'Unknown User', isOnline: false },
                     type: 'TEXT',
-                    status: 'SENT' // Assuming default status
+                    status: 'SENT',
+                    chatId: activeChat.id,
                 };
             });
 
@@ -236,7 +244,6 @@ const ChatPage = () => {
             onDragOver={handleDragOver}
             onDrop={handleDrop}
         >
-            <Sidebar />
             <ChatList
                 chats={chats}
                 setChats={setChats}
