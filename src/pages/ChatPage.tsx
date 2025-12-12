@@ -3,7 +3,7 @@ import ChatList from '../components/ChatList';
 import MessageArea from '../components/MessageArea';
 import websocketService from '../services/websocketService';
 import { useAuth } from '../hooks/useAuth';
-import { Chat, StatusUpdateMessage, Message } from '../types';
+import { Chat, StatusUpdateMessage, Message, UserUpdateMessage, User } from '../types';
 import api from '../services/api';
 import { StompSubscription } from '@stomp/stompjs';
 import SendMediaModal from '../components/SendMediaModal';
@@ -32,10 +32,27 @@ const ChatPage = () => {
 
     const fetchChats = useCallback(async () => {
         try {
-            const response = await api.get('/chats');
-            setChats(response.data);
+            const [chatsResponse, usersResponse] = await Promise.all([
+                api.get<Chat[]>('/chats'),
+                api.get<User[]>('/users')
+            ]);
+            
+            const usersById = new Map(usersResponse.data.map(u => [u.id, u]));
+
+            const chatsWithAvatars = chatsResponse.data.map(chat => ({
+                ...chat,
+                participants: chat.participants.map(p => {
+                    const userWithAvatar = usersById.get(p.id);
+                    return {
+                        ...p,
+                        avatarUrl: userWithAvatar?.avatarUrl || p.avatarUrl,
+                    };
+                })
+            }));
+
+            setChats(chatsWithAvatars);
         } catch (error) {
-            console.error('Failed to fetch chats', error);
+            console.error('Failed to fetch chats or users', error);
         }
     }, []);
 
@@ -58,8 +75,8 @@ const ChatPage = () => {
                 const chatToUpdate = prevChats.find(c => c.id === chatId);
                 if (!chatToUpdate) return prevChats;
 
-                const updatedChat = { ...chatToUpdate, latestMessage: newMessage };
                 const otherChats = prevChats.filter(c => c.id !== chatId);
+                const updatedChat = { ...chatToUpdate, latestMessage: newMessage };
                 return [updatedChat, ...otherChats];
             });
 
@@ -78,7 +95,7 @@ const ChatPage = () => {
     }, [chats, subscribeToMessages]);
 
     useEffect(() => {
-        if (!user?.sub || !token) return;
+        if (!user?.id || !token) return;
 
         const setupGlobalSubscriptions = async () => {
             const presenceTopic = '/topic/presence';
@@ -98,22 +115,47 @@ const ChatPage = () => {
             });
             if (presenceSub) subscriptions.current.set(presenceTopic, presenceSub);
 
-            const newChatTopic = `/topic/users.${user.sub}.chats`;
+            const newChatTopic = `/topic/users.${user.id}.chats`;
             
-            const newChatSub = await websocketService.subscribe(newChatTopic, (newChat: Chat) => {
-                console.log('New chat received via WebSocket:', newChat);
+            const newChatSub = await websocketService.subscribe(newChatTopic, async (newChat: Chat) => {
+                const partner = newChat.participants.find(p => p.id !== user.id);
+                if (partner) {
+                    try {
+                        const userResponse = await api.get<User>(`/users/${partner.id}`);
+                        newChat.participants = newChat.participants.map(p =>
+                            p.id === partner.id ? { ...p, avatarUrl: userResponse.data.avatarUrl } : p
+                        );
+                    } catch (error) {
+                        console.error(`Failed to fetch avatar for user ${partner.id}`, error);
+                    }
+                }
                 
                 setChats(prevChats => {
                     if (prevChats.find(c => c.id === newChat.id)) {
                         return prevChats;
                     }
-                    
                     subscribeToMessages(newChat.id);
-                    
                     return [newChat, ...prevChats];
                 });
             });
             if (newChatSub) subscriptions.current.set(newChatTopic, newChatSub);
+
+            const userUpdateTopic = '/topic/users.updates';
+            const userUpdateSub = await websocketService.subscribe(userUpdateTopic, (message: UserUpdateMessage) => {
+                setChats(prevChats =>
+                    prevChats.map(chat => {
+                        const participantToUpdate = chat.participants.find(p => p.id === message.id);
+                        if (participantToUpdate) {
+                            const updatedParticipants = chat.participants.map(p =>
+                                p.id === message.id ? { ...p, username: message.username, avatarUrl: message.avatarUrl, isOnline: message.isOnline } : p
+                            );
+                            return { ...chat, participants: updatedParticipants };
+                        }
+                        return chat;
+                    })
+                );
+            });
+            if (userUpdateSub) subscriptions.current.set(userUpdateTopic, userUpdateSub);
         };
 
         setupGlobalSubscriptions();
@@ -123,7 +165,7 @@ const ChatPage = () => {
             subscriptions.current.forEach(sub => sub.unsubscribe());
             subscriptions.current.clear();
         };
-    }, [user?.sub, token, subscribeToMessages]);
+    }, [user?.id, token, subscribeToMessages]);
 
     const handleSearch = async (query: string) => {
         setSearchQuery(query);
@@ -146,6 +188,8 @@ const ChatPage = () => {
                     timestamp: message.timestamp,
                     author: author || { id: message.authorId, username: 'Unknown User', isOnline: false },
                     type: 'TEXT',
+                    status: 'SENT',
+                    chatId: activeChat.id,
                 };
             });
 

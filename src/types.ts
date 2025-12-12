@@ -3,10 +3,19 @@
  * These types are designed to perfectly match the DTOs sent by the backend API.
  */
 
+export interface User {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+    avatarUrl?: string;
+}
+
 export interface UserSummary {
   id: number;
   username: string;
   isOnline: boolean;
+  avatarUrl?: string;
 }
 
 export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
@@ -36,5 +45,12 @@ export interface Chat {
 
 export interface StatusUpdateMessage {
     userId: number;
+    isOnline: boolean;
+}
+
+export interface UserUpdateMessage {
+    id: number;
+    username: string;
+    avatarUrl: string;
     isOnline: boolean;
 }

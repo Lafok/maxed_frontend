@@ -81,12 +81,12 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
 
   useEffect(() => {
     const chatId = activeChat?.id;
-    if (!chatId || !user?.sub) return;
+    if (!chatId || !user?.username) return;
 
     const typingTopic = `/topic/chats.${chatId}.typing`;
     
     const subPromise = websocketService.subscribe(typingTopic, (event: TypingEvent) => {
-        if (event.username === user.sub) return;
+        if (event.username === user.username) return;
 
         setTypingUsers(prev => {
             const newSet = new Set(prev);
@@ -100,18 +100,17 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
        subPromise.then(subscription => subscription?.unsubscribe());
        setTypingUsers(new Set());
     };
-  }, [activeChat?.id, user?.sub]);
+  }, [activeChat?.id, user?.username]);
 
   useEffect(() => {
     const chatId = activeChat?.id;
-    if (!chatId || !user?.sub) return;
+    if (!chatId || !user?.username) return;
 
     const readTopic = `/topic/chats.${chatId}.read`;
     const readSubPromise = websocketService.subscribe(readTopic, (event: ReadEvent) => {
-        const currentUser = activeChat.participants.find(p => p.username === user.sub);
-        if (event.userId !== currentUser?.id) {
+        if (event.userId !== user.id) {
              setMessages(prev => prev.map(msg => 
-                 msg.author.username === user.sub && msg.status === MessageStatus.SENT 
+                 msg.author.id === user.id && msg.status === MessageStatus.SENT 
                     ? { ...msg, status: MessageStatus.READ } 
                     : msg
              ));
@@ -121,14 +120,14 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
     return () => {
         readSubPromise.then(sub => sub?.unsubscribe());
     };
-  }, [activeChat?.id, user?.sub, setMessages, activeChat?.participants]);
+  }, [activeChat?.id, user?.id, user?.username, setMessages, activeChat?.participants]);
 
   useEffect(() => {
     const chatId = activeChat?.id;
-    if (!chatId || !user?.sub) return;
+    if (!chatId || !user?.username) return;
 
     const hasUnread = messages.some(
-        m => m.status === MessageStatus.SENT && m.author.username !== user.sub
+        m => m.status === MessageStatus.SENT && m.author.id !== user.id
     );
 
     if (hasUnread) {
@@ -137,7 +136,7 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
         }, 500);
         return () => clearTimeout(timer);
     }
-  }, [messages, activeChat?.id, user?.sub]);
+  }, [messages, activeChat?.id, user?.id, user?.username]);
 
 
   useLayoutEffect(() => {
@@ -159,7 +158,7 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
     }
   };
 
-  const partner = activeChat?.participants.find(p => p.username !== user?.sub);
+  const partner = activeChat?.participants.find(p => p.username !== user?.username);
   const chatPartnerName = activeChat ? (partner?.username || 'Group Chat') : 'Select a chat';
   const isPartnerOnline = partner?.isOnline ?? false;
 
@@ -182,6 +181,8 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
     const messageElements: React.ReactNode[] = [];
     let lastDate: string | null = null;
 
+    const participantsById = new Map(activeChat?.participants.map(p => [p.id, p]));
+
     messages.forEach(msg => {
       const messageDate = new Date(msg.timestamp);
       const messageDateString = messageDate.toDateString();
@@ -193,8 +194,10 @@ const MessageArea = ({ activeChat, messages, setMessages, isDragging, openMediaM
         lastDate = messageDateString;
       }
 
+      const author = participantsById.get(msg.author.id) || msg.author;
+
       messageElements.push(
-        <Message key={msg.id} {...msg} isOwnMessage={msg.author.username === user?.sub} onMediaClick={onMediaClick} />
+        <Message key={msg.id} {...msg} author={author} isOwnMessage={msg.author.id === user?.id} onMediaClick={onMediaClick} />
       );
     });
 
