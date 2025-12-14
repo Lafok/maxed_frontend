@@ -63,11 +63,11 @@ const AvatarUploadModal = ({ onClose }: AvatarUploadModalProps) => {
 
     return (
         <div 
-            className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50" 
+            className="fixed inset-0 bg-black/50 backdrop-blur-lg flex items-center justify-center z-50" 
             onClick={handleCancel}
         >
             <div 
-                className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-lg shadow-xl p-6 w-full max-w-md m-4 border border-white/20" 
+                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md m-4" 
                 onClick={(e) => e.stopPropagation()}
             >
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Change Avatar</h2>
@@ -104,7 +104,7 @@ const AvatarUploadModal = ({ onClose }: AvatarUploadModalProps) => {
                     <button
                         onClick={handleCancel}
                         disabled={isUploading}
-                        className="px-4 py-2 rounded-md text-gray-700 bg-gray-200/70 hover:bg-gray-300/70 dark:text-gray-200 dark:bg-gray-700/70 dark:hover:bg-gray-600/70 disabled:opacity-50"
+                        className="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50"
                     >
                         Cancel
                     </button>
