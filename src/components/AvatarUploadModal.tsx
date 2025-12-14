@@ -62,8 +62,14 @@ const AvatarUploadModal = ({ onClose }: AvatarUploadModalProps) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleCancel}>
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md m-4" onClick={(e) => e.stopPropagation()}>
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50" 
+            onClick={handleCancel}
+        >
+            <div 
+                className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-lg shadow-xl p-6 w-full max-w-md m-4 border border-white/20" 
+                onClick={(e) => e.stopPropagation()}
+            >
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Change Avatar</h2>
 
                 <label
@@ -74,7 +80,7 @@ const AvatarUploadModal = ({ onClose }: AvatarUploadModalProps) => {
                     onDragOver={(e) => handleDrag(e, true)}
                     className={clsx(
                         'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors block',
-                        isDragActive ? 'border-indigo-500 bg-indigo-500 bg-opacity-10' : 'border-gray-400 dark:border-gray-600 hover:border-indigo-400'
+                        isDragActive ? 'border-indigo-500 bg-indigo-500 bg-opacity-20' : 'border-gray-400 dark:border-gray-600 hover:border-indigo-400'
                     )}
                 >
                     <input
@@ -98,7 +104,7 @@ const AvatarUploadModal = ({ onClose }: AvatarUploadModalProps) => {
                     <button
                         onClick={handleCancel}
                         disabled={isUploading}
-                        className="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50"
+                        className="px-4 py-2 rounded-md text-gray-700 bg-gray-200/70 hover:bg-gray-300/70 dark:text-gray-200 dark:bg-gray-700/70 dark:hover:bg-gray-600/70 disabled:opacity-50"
                     >
                         Cancel
                     </button>

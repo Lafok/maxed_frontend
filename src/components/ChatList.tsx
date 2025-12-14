@@ -99,20 +99,16 @@ const ChatList = ({
 
   const handleCreateChat = async (partnerId: number) => {
     try {
-        // First, create the chat
         const chatResponse = await api.post<Chat>('/chats/direct', { partnerId });
         let newChat = chatResponse.data;
 
-        // Then, fetch the full user details for the partner to get the avatar
         const userResponse = await api.get<User>(`/users/${partnerId}`);
         const partnerUser = userResponse.data;
 
-        // Enrich the participant data in the new chat object
         newChat.participants = newChat.participants.map(p => 
             p.id === partnerId ? { ...p, avatarUrl: partnerUser.avatarUrl } : p
         );
 
-        // Update the state with the fully enriched chat object
         setChats(prevChats => [newChat, ...prevChats.filter(c => c.id !== newChat.id)]);
         setActiveChatId(newChat.id);
         setUserSearchQuery('');
@@ -138,14 +134,16 @@ const ChatList = ({
               )}
               onClick={() => setActiveChatId(chat.id)}
             >
-              <Avatar 
-                username={partner?.username || 'G'} 
-                avatarUrl={partner?.avatarUrl}
-                isOnline={partner?.isOnline} 
-                size="md"
-              />
-              <div className="ml-3 truncate flex-grow">
-                <p className={clsx("font-semibold", activeChatId === chat.id && "text-white")}>{partner?.username || 'Group Chat'}</p>
+              <div className="flex-shrink-0">
+                <Avatar 
+                  username={partner?.username || 'G'} 
+                  avatarUrl={partner?.avatarUrl}
+                  isOnline={partner?.isOnline} 
+                  size="md"
+                />
+              </div>
+              <div className="ml-3 truncate flex-grow min-w-0">
+                <p className={clsx("font-semibold truncate", activeChatId === chat.id && "text-white")}>{partner?.username || 'Group Chat'}</p>
                 <p className={clsx("text-sm truncate", activeChatId === chat.id ? "text-gray-200" : "text-gray-400")}>
                   {chat.latestMessage?.content || 'No messages yet'}
                 </p>
@@ -173,9 +171,11 @@ const ChatList = ({
               className="flex items-center p-2.5 rounded-lg cursor-pointer transition-colors mx-2 hover:bg-gray-700"
               onClick={() => handleCreateChat(foundUser.id)}
             >
-              <Avatar username={foundUser.username} avatarUrl={foundUser.avatarUrl} isOnline={foundUser.isOnline} size="md" />
-              <div className="ml-3 truncate">
-                <p className="font-semibold text-white">{foundUser.username}</p>
+              <div className="flex-shrink-0">
+                <Avatar username={foundUser.username} avatarUrl={foundUser.avatarUrl} isOnline={foundUser.isOnline} size="md" />
+              </div>
+              <div className="ml-3 truncate min-w-0">
+                <p className="font-semibold text-white truncate">{foundUser.username}</p>
               </div>
             </div>
         ));
@@ -212,7 +212,7 @@ const ChatList = ({
                                 <span>Change Avatar</span>
                             </a>
                             <a href="#" onClick={() => { logout(); setIsMenuOpen(false); }} className="flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-gray-700">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                 <span>Logout</span>
                             </a>
                         </div>
