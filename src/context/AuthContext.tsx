@@ -5,7 +5,6 @@ import api from '../services/api';
 
 interface DecodedToken {
   sub: string;
-  // Add other token claims if necessary
 }
 
 interface AuthContextType {

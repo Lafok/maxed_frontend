@@ -12,7 +12,6 @@ interface AvatarProps {
 const Avatar = ({ username, avatarUrl, size = 'md', isOnline, className = '', onClick }: AvatarProps) => {
     const [imgError, setImgError] = useState(false);
 
-    // Сброс ошибки если URL изменился (например, пришел новый presigned url)
     useEffect(() => {
         setImgError(false);
     }, [avatarUrl]);
@@ -24,7 +23,6 @@ const Avatar = ({ username, avatarUrl, size = 'md', isOnline, className = '', on
         xl: 'w-24 h-24 text-xl',
     };
 
-    // Генерация цвета на основе имени (чтобы у одного юзера всегда был один цвет)
     const getColor = (name: string) => {
         const colors = [
             'bg-red-500', 'bg-green-500', 'bg-blue-500', 
