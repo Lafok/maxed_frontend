@@ -1,13 +1,16 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { User } from '../types';
+import api from '../services/api';
 
-interface User {
+interface DecodedToken {
   sub: string;
 }
 
 interface AuthContextType {
   token: string | null;
   user: User | null;
+  setUser: (user: User | null) => void;
   login: (newToken: string) => void;
   logout: () => void;
 }
@@ -22,26 +25,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const storedToken = localStorage.getItem('token');
     if (storedToken) {
       setToken(storedToken);
-      try {
-        const decodedUser: User = jwtDecode(storedToken);
-        setUser(decodedUser);
-      } catch (error) {
-        console.error("Failed to decode token on initial load", error);
-        localStorage.removeItem('token');
-      }
+      api.get<User>('/users/me')
+        .then(response => {
+          setUser(response.data);
+        })
+        .catch(error => {
+          console.error("Failed to fetch user data on initial load", error);
+          localStorage.removeItem('token');
+        });
     }
   }, []);
 
   const login = (newToken: string) => {
     setToken(newToken);
     localStorage.setItem('token', newToken);
-    try {
-      const decodedUser: User = jwtDecode(newToken);
-      setUser(decodedUser);
-    } catch (error) {
-      console.error("Failed to decode token on login", error);
-      setUser(null);
-    }
+    api.get<User>('/users/me')
+      .then(response => {
+        setUser(response.data);
+      })
+      .catch(error => {
+        console.error("Failed to fetch user data on login", error);
+        setUser(null);
+      });
   };
 
   const logout = () => {
@@ -51,7 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, setUser, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
